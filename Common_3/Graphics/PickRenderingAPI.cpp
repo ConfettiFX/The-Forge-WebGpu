@@ -229,6 +229,13 @@ extern void initVulkanRendererContext(const char* appName, const RendererContext
 extern void exitVulkanRendererContext(RendererContext* pContext);
 #endif
 
+#if defined(WEBGPU)
+extern void initWebGpuRenderer(const char* appName, const RendererDesc* pSettings, Renderer** ppRenderer);
+extern void exitWebGpuRenderer(Renderer* pRenderer);
+extern void initWebGpuRendererContext(const char* appName, const RendererContextDesc* pSettings, RendererContext** ppContext);
+extern void exitWebGpuRendererContext(RendererContext* pContext);
+#endif
+
 #if defined(METAL)
 extern void initMetalRenderer(const char* appName, const RendererDesc* pSettings, Renderer** ppRenderer);
 extern void initMetalRaytracingFunctions();
@@ -313,6 +320,11 @@ static void initRendererAPI(const char* appName, const RendererDesc* pSettings, 
         initVulkanRenderer(appName, pSettings, ppRenderer);
         break;
 #endif
+#if defined(WEBGPU)
+    case RENDERER_API_WEBGPU:
+        initWebGpuRenderer(appName, pSettings, ppRenderer);
+        break;
+#endif
 #if defined(METAL)
     case RENDERER_API_METAL:
         initMetalRaytracingFunctions();
@@ -360,6 +372,11 @@ static void exitRendererAPI(Renderer* pRenderer, const RendererApi api)
         exitVulkanRenderer(pRenderer);
         break;
 #endif
+#if defined(WEBGPU)
+    case RENDERER_API_WEBGPU:
+        exitWebGpuRenderer(pRenderer);
+        break;
+#endif
 #if defined(METAL)
     case RENDERER_API_METAL:
         exitMetalRenderer(pRenderer);
@@ -401,6 +418,11 @@ static void initRendererContextAPI(const char* appName, const RendererContextDes
         initVulkanRendererContext(appName, pSettings, ppContext);
         break;
 #endif
+#if defined(WEBGPU)
+    case RENDERER_API_WEBGPU:
+        initWebGpuRendererContext(appName, pSettings, ppContext);
+        break;
+#endif
 #if defined(METAL)
     case RENDERER_API_METAL:
         initMetalRendererContext(appName, pSettings, ppContext);
@@ -429,6 +451,11 @@ static void exitRendererContextAPI(RendererContext* pContext, const RendererApi 
 #if defined(VULKAN)
     case RENDERER_API_VULKAN:
         exitVulkanRendererContext(pContext);
+        break;
+#endif
+#if defined(WEBGPU)
+    case RENDERER_API_WEBGPU:
+        exitWebGpuRendererContext(pContext);
         break;
 #endif
 #if defined(METAL)

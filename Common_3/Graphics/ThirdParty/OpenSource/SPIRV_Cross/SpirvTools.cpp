@@ -58,6 +58,13 @@ void ReflectBoundResources(
 
 	  spirv_cross::SPIRType type = pCompiler->get_type(resource.SPIRV_code.type_id);
 
+	  resource.access = (SPIRV_Resource_Access)type.image.access;
+	  resource.format = (SPIRV_Image_Format)type.image.format;
+	  if (type.image.format == spv::ImageFormatMax)
+	  {
+		  resource.format = SPIRV_FORMAT_UNKNOWN;
+	  }
+
 	  // Special case for textureBuffer / imageBuffer
 	  // textureBuffer is considered as separate image  with dimension buffer in SpirV but they require a buffer descriptor of type uniform texel buffer
 	  // imageBuffer is considered as storage image with dimension buffer in SpirV but they require a buffer descriptor of type storage texel buffer
@@ -302,7 +309,7 @@ void ReflectShaderResources(CrossCompiler* pCompiler)
    {
 	  spirv_cross::Resource const& input = allResources.push_constant_buffers[i];
 	  SPIRV_Resource& resource = resources[current_resource++];
-
+	  resource = {};
 
 	  resource.SPIRV_code.id = input.id;
 	  resource.SPIRV_code.type_id = input.type_id;

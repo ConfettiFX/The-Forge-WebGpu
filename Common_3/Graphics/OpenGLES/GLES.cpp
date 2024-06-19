@@ -1086,11 +1086,14 @@ static bool addDevice(Renderer* pRenderer, const RendererDesc* pDesc)
     applyGPUConfigurationRules(&context.mGpus[0].mSettings, &context.mGpus[0].mCapBits);
     // set hard coded openGL limitation
     gpuSettings.mUniformBufferAlignment = 4;
+	gpuSettings.mUploadBufferAlignment = 1;
     gpuSettings.mUploadBufferTextureAlignment = unpackAlignment;
     gpuSettings.mUploadBufferTextureRowAlignment = unpackAlignment;
     gpuSettings.mMaxVertexInputBindings = min((uint32_t)MAX_VERTEX_ATTRIBS, (uint32_t)maxVertexAttr);
     gpuSettings.mMaxBoundTextures = maxCombinedTextureImageUnits;
     gpuSettings.mMultiDrawIndirect = 0;
+    gpuSettings.mMultiDrawIndirectCount = 0;
+    gpuSettings.mRootConstant = 0;
     gpuSettings.mROVsSupported = 0;
     gpuSettings.mTessellationSupported = 0;
     gpuSettings.mGeometryShaderSupported = 0;

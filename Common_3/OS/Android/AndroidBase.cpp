@@ -84,13 +84,15 @@ static OSInfo  gOsInfo = {};
 /// UI
 static UIComponent* pAPISwitchingWindow = NULL;
 static UIComponent* pToggleVSyncWindow = NULL;
+UIWidget*           pSwitchWindowLabel = NULL;
+UIWidget*           pSelectApUIWidget = NULL;
+UIWidget*           pSelectGraphicCardWidget = NULL;
 #if defined(ENABLE_FORGE_RELOAD_SHADER)
 static UIComponent* pReloadShaderComponent = NULL;
 #endif
-UIWidget* pSwitchWindowLabel = NULL;
-UIWidget* pSelectApUIWidget = NULL;
 
-static uint32_t gSelectedApiIndex = 0;
+uint32_t    gSelectedApiIndex = 0;
+RendererApi gRendererApis[RENDERER_API_COUNT] = {};
 
 // PickRenderingAPI.cpp
 extern PlatformParameters gPlatformParameters;
@@ -375,6 +377,25 @@ void exitBaseSubsystems()
 //------------------------------------------------------------------------
 // PLATFORM LAYER USER INTERFACE
 //------------------------------------------------------------------------
+static void togglePlatformUI()
+{
+    gShowPlatformUI = pApp->mSettings.mShowPlatformUI;
+
+#ifdef ENABLE_FORGE_UI
+    extern void platformToggleWindowSystemUI(bool);
+    platformToggleWindowSystemUI(gShowPlatformUI);
+
+    uiSetComponentActive(pToggleVSyncWindow, gShowPlatformUI);
+#if defined(ENABLE_FORGE_RELOAD_SHADER)
+    uiSetComponentActive(pReloadShaderComponent, gShowPlatformUI);
+#endif
+
+    // toggleProfilerMenuUI(gShowPlatformUI);
+
+    // if (pAPISwitchingWindow)
+    //    uiSetComponentActive(pAPISwitchingWindow, gShowPlatformUI);
+#endif
+}
 
 void setupPlatformUI(int32_t width, int32_t height)
 {
@@ -404,19 +425,35 @@ void setupPlatformUI(int32_t width, int32_t height)
     // MICROPROFILER UI
     toggleProfilerMenuUI(true);
 
-    gSelectedApiIndex = gPlatformParameters.mSelectedRendererApi;
+    static const char* apiNames[RENDERER_API_COUNT] = {};
+    uint32_t           apiIndex[RENDERER_API_COUNT] = {};
+    uint32_t           apiNameCount = 0;
 
-    static const char* pApiNames[] = {
 #if defined(GLES)
-        "GLES",
+    if (!gGLESUnsupported)
+    {
+        apiNames[apiNameCount] = "GLES";
+        gRendererApis[apiNameCount] = RENDERER_API_GLES;
+        apiIndex[RENDERER_API_GLES] = apiNameCount;
+        ++apiNameCount;
+    }
 #endif
 #if defined(VULKAN)
-        "Vulkan",
+    apiNames[apiNameCount] = "Vulkan";
+    gRendererApis[apiNameCount] = RENDERER_API_VULKAN;
+    apiIndex[RENDERER_API_VULKAN] = apiNameCount;
+    ++apiNameCount;
 #endif
-    };
-    uint32_t apiNameCount = sizeof(pApiNames) / sizeof(*pApiNames);
+#if defined(WEBGPU)
+    apiNames[apiNameCount] = "WebGpu";
+    gRendererApis[apiNameCount] = RENDERER_API_WEBGPU;
+    apiIndex[RENDERER_API_WEBGPU] = apiNameCount;
+    ++apiNameCount;
+#endif
 
-    if (apiNameCount > 1 && !gGLESUnsupported)
+    gSelectedApiIndex = apiIndex[gPlatformParameters.mSelectedRendererApi];
+
+    if (apiNameCount > 1)
     {
         UIComponentDesc.mStartPosition = vec2(width * 0.4f, height * 0.01f);
         uiCreateComponent("API Switching", &UIComponentDesc, &pAPISwitchingWindow);
@@ -424,8 +461,8 @@ void setupPlatformUI(int32_t width, int32_t height)
         // Select Api
         DropdownWidget selectApUIWidget;
         selectApUIWidget.pData = &gSelectedApiIndex;
-        selectApUIWidget.pNames = pApiNames;
-        selectApUIWidget.mCount = RENDERER_API_COUNT;
+        selectApUIWidget.pNames = apiNames;
+        selectApUIWidget.mCount = apiNameCount;
 
         pSelectApUIWidget = uiCreateComponentWidget(pAPISwitchingWindow, "Select API", &selectApUIWidget, WIDGET_TYPE_DROPDOWN);
         pSelectApUIWidget->pOnEdited = [](void* pUserData)
@@ -434,6 +471,27 @@ void setupPlatformUI(int32_t width, int32_t height)
             resetDesc.mType = RESET_TYPE_API_SWITCH;
             requestReset(&resetDesc);
         };
+
+#if defined(WEBGPU)
+        if (gPlatformParameters.mSelectedRendererApi == RENDERER_API_WEBGPU)
+        {
+            static const char* gpuNames[] = { gPlatformParameters.ppAvailableGpuNames[0], gPlatformParameters.ppAvailableGpuNames[1],
+                                              gPlatformParameters.ppAvailableGpuNames[2], gPlatformParameters.ppAvailableGpuNames[3] };
+
+            DropdownWidget selectGraphicCardUIWidget = {};
+            selectGraphicCardUIWidget.pData = &gPlatformParameters.mSelectedGpuIndex;
+            selectGraphicCardUIWidget.pNames = gpuNames;
+            selectGraphicCardUIWidget.mCount = gPlatformParameters.mAvailableGpuCount;
+
+            pSelectGraphicCardWidget =
+                uiCreateComponentWidget(pAPISwitchingWindow, "Select Graphic Card", &selectGraphicCardUIWidget, WIDGET_TYPE_DROPDOWN);
+            pSelectGraphicCardWidget->pOnEdited = [](void* pUserData)
+            {
+                ResetDesc resetDescriptor{ RESET_TYPE_GRAPHIC_CARD_SWITCH };
+                requestReset(&resetDescriptor);
+            };
+        }
+#endif
     }
 
 #if defined(ENABLE_FORGE_SCRIPTING) && defined(AUTOMATED_TESTING)
@@ -447,23 +505,6 @@ void setupPlatformUI(int32_t width, int32_t height)
     }
     luaDefineScripts(scriptDescs, numScripts);
 #endif
-#endif
-}
-
-void togglePlatformUI()
-{
-    gShowPlatformUI = pApp->mSettings.mShowPlatformUI;
-
-#ifdef ENABLE_FORGE_UI
-    extern void platformToggleWindowSystemUI(bool);
-    platformToggleWindowSystemUI(gShowPlatformUI);
-
-    uiSetComponentActive(pToggleVSyncWindow, gShowPlatformUI);
-#if defined(ENABLE_FORGE_RELOAD_SHADER)
-    uiSetComponentActive(pReloadShaderComponent, gShowPlatformUI);
-#endif
-    if (pAPISwitchingWindow)
-        uiSetComponentActive(pAPISwitchingWindow, gShowPlatformUI);
 #endif
 }
 
@@ -706,7 +747,14 @@ int AndroidMain(void* param, IApp* app)
 
             exitBaseSubsystems();
 
-            gPlatformParameters.mSelectedRendererApi = (RendererApi)gSelectedApiIndex;
+            gPlatformParameters.mSelectedRendererApi = gRendererApis[gSelectedApiIndex];
+
+            if (gResetDescriptor.mType & RESET_TYPE_GRAPHIC_CARD_SWITCH)
+            {
+                ASSERT(gPlatformParameters.mSelectedGpuIndex < gPlatformParameters.mAvailableGpuCount);
+                gPlatformParameters.mPreferedGpuId = gPlatformParameters.pAvailableGpuIds[gPlatformParameters.mSelectedGpuIndex];
+            }
+
             pSettings->mInitialized = false;
 
             {

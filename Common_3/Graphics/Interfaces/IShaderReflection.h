@@ -48,6 +48,13 @@ typedef enum TextureDimension
     TEXTURE_DIM_UNDEFINED,
 } TextureDimension;
 
+typedef enum TextureAccess
+{
+    TEXTURE_ACCESS_READONLY,
+    TEXTURE_ACCESS_WRITEONLY,
+    TEXTURE_ACCESS_READWRITE,
+} TextureAccess;
+
 struct VertexInput
 {
     // resource name
@@ -98,6 +105,12 @@ struct ShaderResource
 
     // 1D / 2D / Array / MSAA / ...
     TextureDimension dim;
+
+    // Access - readonly, ...
+    TextureAccess access;
+
+    // Storage format
+    TinyImageFormat format;
 
 #if defined(METAL)
     uint32_t           alignment;

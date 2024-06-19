@@ -31,6 +31,7 @@
 #endif
 
 #include "../../Resources/ResourceLoader/ThirdParty/OpenSource/tinyimageformat/tinyimageformat_base.h"
+#include "../../Resources/ResourceLoader/ThirdParty/OpenSource/tinyimageformat/tinyimageformat_query.h"
 
 #include "../../OS/Interfaces/IOperatingSystem.h"
 #include "../../Utilities/Interfaces/ILog.h"
@@ -111,6 +112,9 @@ typedef enum RendererApi
 #endif
 #if defined(VULKAN)
     RENDERER_API_VULKAN,
+#endif
+#if defined(WEBGPU)
+    RENDERER_API_WEBGPU,
 #endif
 #if defined(DIRECT3D11)
     RENDERER_API_D3D11,
@@ -769,6 +773,15 @@ typedef struct QueryPool
             uint32_t    mNodeIndex;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUQuerySet  pQuerySet;
+            WGPUBuffer    pResolveBuffer;
+            WGPUBuffer    pReadbackBuffer;
+            WGPUQueryType mType;
+        } mWgp;
+#endif
 #if defined(METAL)
         struct
         {
@@ -1060,6 +1073,13 @@ typedef struct DEFINE_ALIGNED(Buffer, 64)
             uint64_t                mOffset;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            /// Native handle of the underlying resource
+            WGPUBuffer pBuffer;
+        } mWgp;
+#endif
 #if defined(METAL)
         struct
         {
@@ -1187,6 +1207,15 @@ typedef struct DEFINE_ALIGNED(Texture, 64)
             };
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUTexture      pTexture;
+            WGPUTextureView  pSrv;
+            WGPUTextureView  pSrvStencil;
+            WGPUTextureView* pUavs;
+        } mWgp;
+#endif
 #if defined(METAL)
         struct
         {
@@ -1313,6 +1342,13 @@ typedef struct DEFINE_ALIGNED(RenderTarget, 64)
             uint32_t     mId;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUTextureView  pDefault;
+            WGPUTextureView* pSlices;
+        } mWgp;
+#endif
 #if defined(DIRECT3D11)
         struct
         {
@@ -1433,6 +1469,13 @@ typedef struct DEFINE_ALIGNED(Sampler, 16)
             VkSamplerYcbcrConversionInfo mSamplerYcbcrConversionInfo;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            /// Native handle of the underlying resource
+            WGPUSampler pSampler;
+        } mWgp;
+#endif
 #if defined(METAL)
         struct
         {
@@ -1520,6 +1563,13 @@ typedef struct DEFINE_ALIGNED(DescriptorInfo, 16)
             uint32_t mReg : 20;
             uint32_t mStages : 8;
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            uint32_t             mReg : 20;
+            WGPUShaderStageFlags mStages;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -1622,6 +1672,18 @@ typedef struct DEFINE_ALIGNED(RootSignature, 64)
             VkDescriptorPool      pEmptyDescriptorPool[DESCRIPTOR_UPDATE_FREQ_COUNT];
             VkDescriptorSet       pEmptyDescriptorSet[DESCRIPTOR_UPDATE_FREQ_COUNT];
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUPipelineLayout  pPipelineLayout;
+            WGPUBindGroupLayout mDescriptorSetLayouts[DESCRIPTOR_UPDATE_FREQ_COUNT];
+            WGPUBindGroup       pStaticSamplerSet;
+            WGPUSampler*        pStaticSamplers;
+            uint8_t             mDynamicDescriptorCounts[DESCRIPTOR_UPDATE_FREQ_COUNT];
+            uint8_t             mDynamicDescriptorStartIndex[DESCRIPTOR_UPDATE_FREQ_COUNT];
+            uint8_t             mStaticSamplersOnly;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -1777,6 +1839,21 @@ typedef struct DEFINE_ALIGNED(DescriptorSet, 64)
             uint8_t                    mUpdateFrequency;
             uint8_t                    mNodeIndex;
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUBindGroup*             pHandles;
+            const RootSignature*       pRootSignature;
+            struct DynamicUniformData* pDynamicUniformData;
+            WGPUBindGroupEntry*        pEntries;
+            uint32_t                   mEntryCount;
+            uint32_t                   mMaxSets;
+            uint8_t                    mDynamicOffsetCount;
+            uint8_t                    mDynamicOffsetHandleIndex;
+            uint8_t                    mUpdateFrequency;
+            uint8_t                    mNodeIndex;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -1941,6 +2018,20 @@ typedef struct DEFINE_ALIGNED(Cmd, 64)
             uint32_t         mType : 3;
             uint32_t         mIsRendering : 1;
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUCommandEncoder      pEncoder;
+            WGPURenderPassEncoder   pRenderEncoder;
+            WGPUComputePassEncoder  pComputeEncoder;
+            WGPUCommandBuffer       pCmdBuf;
+            WGPUPipelineLayout      pBoundPipelineLayout;
+            WGPURenderPassEncoder*  pRenderEncoderArray;
+            WGPUComputePassEncoder* pComputeEncoderArray;
+            bool                    mInsideRenderPass;
+            bool                    mInsideComputePass;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -2174,6 +2265,15 @@ typedef struct Queue
             uint32_t  mGpuMode : 3;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUQueue  pQueue;
+            Renderer*  pRenderer;
+            WGPUFuture mWorkDoneFuture;
+            bool       mFutureValid;
+        } mWgp;
+#endif
 #if defined(GLES)
         struct
         {
@@ -2231,6 +2331,9 @@ typedef struct BinaryShaderStageDesc
     uint32_t    mNumThreadsPerGroup[3];
     uint32_t    mOutputRenderTargetTypesMask;
 #endif
+#if defined(WEBGPU_NATIVE)
+    char*       pGlsl;
+#endif
 #if defined(GLES)
     GLuint      mShader;
 #endif
@@ -2279,6 +2382,12 @@ typedef struct Shader
             char**                pEntryNames;
             VkSpecializationInfo* pSpecializationInfo;
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUShaderModule* pShaderModules;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -2432,6 +2541,8 @@ typedef struct GraphicsPipelineDesc
     uint32_t          mSampleQuality;
     TinyImageFormat   mDepthStencilFormat;
     PrimitiveTopology mPrimitiveTopo;
+    // same index type used when binding index buffers (cmdBindIndexBuffer)
+    uint32_t          mIndexType;
     bool              mSupportIndirectCommandBuffer;
     bool              mVRFoveatedRendering;
     bool              mUseCustomSampleLocations;
@@ -2481,6 +2592,17 @@ typedef struct DEFINE_ALIGNED(Pipeline, 64)
             ShaderStage mShaderStages;
 #endif
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            union
+            {
+                WGPURenderPipeline  pRender;
+                WGPUComputePipeline pCompute;
+            };
+            PipelineType mType;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -2722,6 +2844,13 @@ typedef struct SwapChain
             uint32_t       mPresentQueueFamilyIndex : 5;
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUSurface              pSurface;
+            WGPUSurfaceConfiguration mConfig;
+        } mWgp;
+#endif
 #if defined(METAL)
         struct
         {
@@ -2905,11 +3034,6 @@ typedef struct GPUCapBits
     FormatCapability mFormatCaps[TinyImageFormat_Count];
 } GPUCapBits;
 
-typedef enum DefaultResourceAlignment
-{
-    RESOURCE_BUFFER_ALIGNMENT = 4U,
-} DefaultResourceAlignment;
-
 typedef enum WaveOpsSupportFlags
 {
     WAVE_OPS_SUPPORT_FLAG_NONE = 0x0,
@@ -2931,6 +3055,7 @@ typedef struct GPUSettings
 {
     uint64_t mVRAM; // set to 0 on OpenGLES platform
     uint32_t mUniformBufferAlignment;
+    uint32_t mUploadBufferAlignment;
     uint32_t mUploadBufferTextureAlignment;
     uint32_t mUploadBufferTextureRowAlignment;
     uint32_t mMaxVertexInputBindings;
@@ -2945,6 +3070,8 @@ typedef struct GPUSettings
     uint32_t mMaxTotalComputeThreads;
     uint32_t mMaxComputeThreads[3];
     uint32_t mMultiDrawIndirect : 1;
+    uint32_t mMultiDrawIndirectCount : 1;
+    uint32_t mRootConstant : 1;
     uint32_t mIndirectRootConstant : 1;
     uint32_t mBuiltinDrawID : 1;
     uint32_t mIndirectCommandBuffer : 1;
@@ -3036,6 +3163,14 @@ typedef struct DEFINE_ALIGNED(Renderer, 64)
                 uint8_t mQueueFamilyIndices[3];
             };
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUDevice          pDevice;
+            WGPUBindGroupLayout pEmptyDescriptorSetLayout;
+            WGPUBindGroup       pEmptyDescriptorSet;
+        } mWgp;
 #endif
 #if defined(METAL)
         struct
@@ -3207,6 +3342,15 @@ typedef struct GpuInfo
 #endif
         } mVk;
 #endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUAdapter pAdapter;
+            WGPULimits  mLimits;
+            bool        mStaticSamplers : 1;
+            bool        mCompatMode : 1;
+        } mWgp;
+#endif
 #if defined(DIRECT3D11)
         struct
         {
@@ -3256,6 +3400,12 @@ typedef struct RendererContext
             uint32_t                 mDebugReportExtension : 1;
             uint32_t                 mDeviceGroupCreationExtension : 1;
         } mVk;
+#endif
+#if defined(WEBGPU)
+        struct
+        {
+            WGPUInstance pInstance;
+        } mWgp;
 #endif
 #if defined(DIRECT3D11)
         struct

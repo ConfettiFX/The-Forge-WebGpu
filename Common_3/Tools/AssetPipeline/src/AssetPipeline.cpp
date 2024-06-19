@@ -1836,10 +1836,10 @@ bool ProcessGLTF(AssetPipelineParams* assetParams, ProcessGLTFParams* glTFParams
                 (uint32_t*)((uint8_t*)geomData->pInverseBindPoses + round_up(jointCount * sizeof(*geomData->pInverseBindPoses), 16));
         }
 
+        uint8_t* pUserData =
+            jointCount > 0 ? ((uint8_t*)geomData->pJointRemaps + round_up(jointCount * sizeof(uint32_t), 16)) : (uint8_t*)(geomData + 1);
         if (userDataSize > 0)
         {
-            uint8_t* pUserData = jointCount > 0 ? ((uint8_t*)geomData->pJointRemaps + round_up(jointCount * sizeof(uint32_t), 16))
-                                                : (uint8_t*)(geomData + 1);
             geomData->pUserData = pUserData;
             geomData->mUserDataSize = userDataSize;
             glTFParams->pWriteExtrasCallback(&userDataSize, pUserData, glTFParams->pCallbackUserData);
@@ -2181,6 +2181,7 @@ bool ProcessGLTF(AssetPipelineParams* assetParams, ProcessGLTFParams* glTFParams
 
                 indexCount += (uint32_t)(prim->indices->count);
                 vertexCount += optimizedVertexCount;
+
                 ++drawCount;
             }
         }

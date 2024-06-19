@@ -26,6 +26,7 @@
 #include "../Utilities/ThirdParty/OpenSource/Nothings/stb_ds.h"
 
 #include "../Graphics/GraphicsConfig.h"
+#include "../Utilities/RingBuffer.h"
 
 #ifdef ENABLE_FORGE_INPUT
 #include "../Application/ThirdParty/OpenSource/gainput/lib/include/gainput/gainput.h"
@@ -116,6 +117,7 @@ typedef struct VirtualJoystick
     Shader*        pShader = NULL;
     RootSignature* pRootSignature = NULL;
     DescriptorSet* pDescriptorSet = NULL;
+    GPURingBuffer  mUniformRingBuffer = {};
     Pipeline*      pPipeline = NULL;
     Texture*       pTexture = NULL;
     Sampler*       pSampler = NULL;
@@ -124,9 +126,8 @@ typedef struct VirtualJoystick
     float2         mRenderScale = float2(0.f, 0.f);
 
     // input related
-    float    mInsideRadius = 100.f;
-    float    mOutsideRadius = 200.f;
-    uint32_t mRootConstantIndex;
+    float mInsideRadius = 100.f;
+    float mOutsideRadius = 200.f;
 
     struct StickInput
     {
@@ -139,6 +140,12 @@ typedef struct VirtualJoystick
     StickInput mSticks[2];
 #endif
 } VirtualJoystick;
+
+struct DEFINE_ALIGNED(VirtualJoystickCbv, 16)
+{
+    float4 color;
+    float2 scaleBias;
+};
 
 static VirtualJoystick* gVirtualJoystick = NULL;
 
@@ -190,6 +197,12 @@ void initVirtualJoystick(VirtualJoystickDesc* pDesc, VirtualJoystick** ppVirtual
     vbDesc.mDesc.mSize = 128 * 4 * sizeof(float4);
     vbDesc.ppBuffer = &gVirtualJoystick->pMeshBuffer;
     addResource(&vbDesc, NULL);
+
+    const uint32_t maxFrames = 5;
+    uint32_t       dataSize = round_up(sizeof(VirtualJoystickCbv), pRenderer->pGpu->mSettings.mUniformBufferAlignment);
+    dataSize = round_up(dataSize, pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+    dataSize *= maxFrames;
+    addUniformGPURingBuffer(pRenderer, dataSize, &gVirtualJoystick->mUniformRingBuffer);
 #endif
 
     // Joystick is good!
@@ -204,9 +217,10 @@ void exitVirtualJoystick(VirtualJoystick** ppVirtualJoystick)
         return;
 
 #if TOUCH_INPUT
-    removeSampler(pVirtualJoystick->pRenderer, pVirtualJoystick->pSampler);
-    removeResource(pVirtualJoystick->pMeshBuffer);
-    removeResource(pVirtualJoystick->pTexture);
+    removeGPURingBuffer(&gVirtualJoystick->mUniformRingBuffer);
+    removeSampler(gVirtualJoystick->pRenderer, gVirtualJoystick->pSampler);
+    removeResource(gVirtualJoystick->pMeshBuffer);
+    removeResource(gVirtualJoystick->pTexture);
 #endif
 
     tf_delete(pVirtualJoystick);
@@ -248,7 +262,6 @@ bool loadVirtualJoystick(ReloadType loadType, TinyImageFormat colorFormat, uint3
             textureRootDesc.ppStaticSamplerNames = pStaticSamplerNames;
             textureRootDesc.ppStaticSamplers = &gVirtualJoystick->pSampler;
             addRootSignature(pRenderer, &textureRootDesc, &gVirtualJoystick->pRootSignature);
-            gVirtualJoystick->mRootConstantIndex = getDescriptorIndexFromName(gVirtualJoystick->pRootSignature, "uRootConstants");
 
             DescriptorSetDesc descriptorSetDesc = { gVirtualJoystick->pRootSignature, DESCRIPTOR_UPDATE_FREQ_NONE, 1 };
             addDescriptorSet(pRenderer, &descriptorSetDesc, &gVirtualJoystick->pDescriptorSet);
@@ -355,21 +368,26 @@ void drawVirtualJoystick(Cmd* pCmd, const float4* color)
     if (!gVirtualJoystick || !(gVirtualJoystick->mSticks[0].mPressed || gVirtualJoystick->mSticks[1].mPressed))
         return;
 
-    struct RootConstants
-    {
-        float4 color;
-        float2 scaleBias;
-        int    _pad[2];
-    } data = {};
+    VirtualJoystickCbv data = {};
+    data.color = *color;
+    data.scaleBias = { 2.0f / (float)gVirtualJoystick->mRenderSize[0], -2.0f / (float)gVirtualJoystick->mRenderSize[1] };
 
     cmdSetViewport(pCmd, 0.0f, 0.0f, gVirtualJoystick->mRenderSize[0], gVirtualJoystick->mRenderSize[1], 0.0f, 1.0f);
     cmdSetScissor(pCmd, 0u, 0u, (uint32_t)gVirtualJoystick->mRenderSize[0], (uint32_t)gVirtualJoystick->mRenderSize[1]);
 
+    GPURingBufferOffset uniformBlock = getGPURingBufferOffset(&gVirtualJoystick->mUniformRingBuffer, sizeof(data));
+    BufferUpdateDesc    updateDesc = { uniformBlock.pBuffer, uniformBlock.mOffset, sizeof(data) };
+    beginUpdateResource(&updateDesc);
+    memcpy(updateDesc.pMappedData, &data, sizeof(data));
+    endUpdateResource(&updateDesc);
+
     cmdBindPipeline(pCmd, gVirtualJoystick->pPipeline);
-    cmdBindDescriptorSet(pCmd, 0, gVirtualJoystick->pDescriptorSet);
-    data.color = *color;
-    data.scaleBias = { 2.0f / (float)gVirtualJoystick->mRenderSize[0], -2.0f / (float)gVirtualJoystick->mRenderSize[1] };
-    cmdBindPushConstants(pCmd, gVirtualJoystick->pRootSignature, gVirtualJoystick->mRootConstantIndex, &data);
+    DescriptorData      params[1] = {};
+    DescriptorDataRange range = { (uint32_t)uniformBlock.mOffset, sizeof(data) };
+    params[0].pName = "uRootCbv";
+    params[0].ppBuffers = &uniformBlock.pBuffer;
+    params[0].pRanges = &range;
+    cmdBindDescriptorSetWithRootCbvs(pCmd, 0, gVirtualJoystick->pDescriptorSet, 1, params);
 
     // Draw the camera controller's virtual joysticks.
     float extSide = gVirtualJoystick->mOutsideRadius;

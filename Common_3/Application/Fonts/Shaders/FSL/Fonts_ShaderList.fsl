@@ -9,3 +9,18 @@
 #vert FT_MULTIVIEW fontstash3D.vert
 #include "fontstash3D.vert.fsl"
 #end
+
+#frag FT_MULTIVIEW fontstash_npc.frag
+#define FONTS_NO_PUSH_CONSTANT
+#include "fontstash.frag.fsl"
+#end
+
+#vert FT_MULTIVIEW fontstash2D_npc.vert
+#define FONTS_NO_PUSH_CONSTANT
+#include "fontstash2D.vert.fsl"
+#end
+
+#vert FT_MULTIVIEW fontstash3D_npc.vert
+#define FONTS_NO_PUSH_CONSTANT
+#include "fontstash3D.vert.fsl"
+#end

@@ -36,15 +36,22 @@ android {
 		prefab true
 	}
     
-    /*
     signingConfigs {
-        internal_build {
+        debug {
         	initWith(signingConfigs.debug)
         }
-        shipping_build {
+        release {
             // Note: This should be replaced with proper shipping signing configuration before releasing the app,
             //       this is a workaround to be able to install release builds without signature
         	initWith(signingConfigs.debug)
+            storeFile file("release_key.jks")
+            storePassword("passcode")
+            keyAlias("release_key_alias")
+            keyPassword("passcode")
+
+            // Optional, specify signing versions used
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
     }
 
@@ -56,7 +63,7 @@ android {
             debuggable true
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.internal_build
+            signingConfig signingConfigs.debug
         }
         profile {
             initWith(buildTypes.release)
@@ -64,18 +71,18 @@ android {
             debuggable false
             minifyEnabled true
             shrinkResources true
-            signingConfig signingConfigs.internal_build
+            signingConfig signingConfigs.debug
         }
         release {
             initWith(buildTypes.release)
             applicationIdSuffix ".release"
+            // When shipping 'debuggable' should be false
             debuggable false
             minifyEnabled true
             shrinkResources true
-            signingConfig signingConfigs.shipping_build
+            signingConfig signingConfigs.release
         }
     }
-    */
 }
 
 dependencies {

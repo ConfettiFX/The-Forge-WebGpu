@@ -49,10 +49,13 @@
 // Comment/uncomment includes to disable/enable rendering APIs
 #if defined(_WINDOWS)
 #ifndef _WINDOWS7
-#include "Direct3D12/Direct3D12Config.h"
+//#include "Direct3D12/Direct3D12Config.h"
 #endif
 #include "Direct3D11/Direct3D11Config.h"
 #include "Vulkan/VulkanConfig.h"
+#if defined(WEBGPU)
+#include "../../WebGpu/Common_3/Graphics/WebGpu/WebGpuConfig.h"
+#endif
 #elif defined(XBOX)
 #include "Direct3D12/Direct3D12Config.h"
 #elif defined(__APPLE__)
@@ -63,6 +66,9 @@
 #endif
 #ifdef ARCH_ARM64
 #include "Vulkan/VulkanConfig.h"
+#if defined(WEBGPU)
+#include "../../WebGpu/Common_3/Graphics/WebGpu/WebGpuConfig.h"
+#endif
 #endif
 #elif defined(NX64)
 #include "Vulkan/VulkanConfig.h"
@@ -116,11 +122,11 @@ enum
 #endif
 #endif
 
-#if (defined(DIRECT3D12) + defined(DIRECT3D11) + defined(VULKAN) + defined(GLES) + defined(METAL) + defined(ORBIS) + defined(PROSPERO) + \
-     defined(NX64)) == 0
+#if (defined(DIRECT3D12) + defined(DIRECT3D11) + defined(VULKAN) + defined(GLES) + defined(WEBGPU) + defined(METAL) + defined(ORBIS) + \
+     defined(PROSPERO) + defined(NX64)) == 0
 #error "No rendering API defined"
-#elif (defined(DIRECT3D12) + defined(DIRECT3D11) + defined(VULKAN) + defined(GLES) + defined(METAL) + defined(ORBIS) + defined(PROSPERO) + \
-       defined(NX64)) > 1
+#elif (defined(DIRECT3D12) + defined(DIRECT3D11) + defined(VULKAN) + defined(GLES) + defined(WEBGPU) + defined(METAL) + defined(ORBIS) + \
+       defined(PROSPERO) + defined(NX64)) > 1
 #define USE_MULTIPLE_RENDER_APIS
 #endif
 

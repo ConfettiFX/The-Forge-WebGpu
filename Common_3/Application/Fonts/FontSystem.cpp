@@ -144,8 +144,9 @@ static void fonsImplementationRenderText(void* userPtr, const float* verts, cons
         gFontstash.mUpdateTexture = false;
     }
 
-    GPURingBufferOffset buffer = getGPURingBufferOffset(&gFontstash.mMeshRingBuffer, nverts * sizeof(float4));
-    BufferUpdateDesc    update = { buffer.pBuffer, buffer.mOffset };
+    uint32_t            size = round_up(nverts * sizeof(float4), pCmd->pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+    GPURingBufferOffset buffer = getGPURingBufferOffset(&gFontstash.mMeshRingBuffer, size);
+    BufferUpdateDesc    update = { buffer.pBuffer, buffer.mOffset, size };
     beginUpdateResource(&update);
     float4* vtx = (float4*)update.pMappedData;
     // build vertices
@@ -169,14 +170,23 @@ static void fonsImplementationRenderText(void* userPtr, const float* verts, cons
     {
         float4 color;
         float2 scaleBias;
-#ifdef METAL
-        float _pad0;
-        float _pad1;
-#endif
     } data;
 
     data.color = color;
     data.scaleBias = gFontstash.mScaleBias;
+
+    const bool          rootConstantSupport = gFontstash.pRenderer->pGpu->mSettings.mRootConstant;
+    GPURingBufferOffset uniformBlockNpc = {};
+    const uint32_t      dataSize = round_up(sizeof(data), 16);
+    const uint32_t      reqSize = round_up(sizeof(data), gFontstash.pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+    if (!rootConstantSupport)
+    {
+        uniformBlockNpc = getGPURingBufferOffset(&gFontstash.mUniformRingBuffer, reqSize);
+        BufferUpdateDesc updateDesc = { uniformBlockNpc.pBuffer, uniformBlockNpc.mOffset, dataSize };
+        beginUpdateResource(&updateDesc);
+        memcpy(updateDesc.pMappedData, &data, sizeof(data));
+        endUpdateResource(&updateDesc);
+    }
 
     if (draw->mText3D)
     {
@@ -185,20 +195,29 @@ static void fonsImplementationRenderText(void* userPtr, const float* verts, cons
         data.scaleBias.x = -data.scaleBias.x;
 
         GPURingBufferOffset uniformBlock = getGPURingBufferOffset(&gFontstash.mUniformRingBuffer, sizeof(mvp));
-        BufferUpdateDesc    updateDesc = { uniformBlock.pBuffer, uniformBlock.mOffset };
+        BufferUpdateDesc    updateDesc = { uniformBlock.pBuffer, uniformBlock.mOffset, sizeof(mvp) };
         beginUpdateResource(&updateDesc);
         memcpy(updateDesc.pMappedData, &mvp, sizeof(mvp));
         endUpdateResource(&updateDesc);
 
-        const uint32_t size = sizeof(mvp);
+        const uint32_t mvpSize = sizeof(mvp);
         const uint32_t stride = sizeof(float4);
 
-        DescriptorDataRange range = { (uint32_t)uniformBlock.mOffset, size };
-        DescriptorData      params[1] = {};
+        DescriptorDataRange ranges[2] = { { (uint32_t)uniformBlock.mOffset, mvpSize } };
+        DescriptorData      params[2] = {};
+        uint32_t            paramCount = 1;
         params[0].pName = "uniformBlock_rootcbv";
         params[0].ppBuffers = &uniformBlock.pBuffer;
-        params[0].pRanges = &range;
-        cmdBindDescriptorSetWithRootCbvs(pCmd, 0, gFontstash.pDescriptorSets, 1, params);
+        params[0].pRanges = &ranges[0];
+        if (!rootConstantSupport)
+        {
+            ranges[1] = { (uint32_t)uniformBlockNpc.mOffset, dataSize };
+            params[1].pName = "uRootCbv";
+            params[1].ppBuffers = &uniformBlockNpc.pBuffer;
+            params[1].pRanges = &ranges[1];
+            ++paramCount;
+        }
+        cmdBindDescriptorSetWithRootCbvs(pCmd, 0, gFontstash.pDescriptorSets, paramCount, params);
         cmdBindPushConstants(pCmd, gFontstash.pRootSignature, gFontstash.mRootConstantIndex, &data);
         cmdBindVertexBuffer(pCmd, 1, &buffer.pBuffer, &stride, &buffer.mOffset);
         cmdDraw(pCmd, nverts, 0);
@@ -206,8 +225,24 @@ static void fonsImplementationRenderText(void* userPtr, const float* verts, cons
     else
     {
         const uint32_t stride = sizeof(float4);
-        cmdBindDescriptorSet(pCmd, 0, gFontstash.pDescriptorSets);
-        cmdBindPushConstants(pCmd, gFontstash.pRootSignature, gFontstash.mRootConstantIndex, &data);
+        if (rootConstantSupport)
+        {
+            cmdBindDescriptorSet(pCmd, 0, gFontstash.pDescriptorSets);
+            cmdBindPushConstants(pCmd, gFontstash.pRootSignature, gFontstash.mRootConstantIndex, &data);
+        }
+        else
+        {
+            DescriptorDataRange ranges[2] = { { (uint32_t)uniformBlockNpc.mOffset, sizeof(mat4) },
+                                              { (uint32_t)uniformBlockNpc.mOffset, dataSize } };
+            DescriptorData      params[2] = {};
+            params[0].pName = "uniformBlock_rootcbv";
+            params[0].ppBuffers = &uniformBlockNpc.pBuffer;
+            params[0].pRanges = &ranges[0];
+            params[1].pName = "uRootCbv";
+            params[1].ppBuffers = &uniformBlockNpc.pBuffer;
+            params[1].pRanges = &ranges[1];
+            cmdBindDescriptorSetWithRootCbvs(pCmd, 0, gFontstash.pDescriptorSets, 2, params);
+        }
         cmdBindVertexBuffer(pCmd, 1, &buffer.pBuffer, &stride, &buffer.mOffset);
         cmdDraw(pCmd, nverts, 0);
     }
@@ -344,6 +379,13 @@ void loadFontSystem(const FontSystemLoadDesc* pDesc)
             ShaderLoadDesc text3DShaderDesc = {};
             text3DShaderDesc.mStages[0] = { "fontstash3D.vert" };
             text3DShaderDesc.mStages[1] = { "fontstash.frag" };
+            if (!gFontstash.pRenderer->pGpu->mSettings.mRootConstant)
+            {
+                text2DShaderDesc.mStages[0].pFileName = "fontstash2D_npc.vert";
+                text2DShaderDesc.mStages[1].pFileName = "fontstash_npc.frag";
+                text3DShaderDesc.mStages[0].pFileName = "fontstash3D_npc.vert";
+                text3DShaderDesc.mStages[1].pFileName = "fontstash_npc.frag";
+            }
 
             addShader(gFontstash.pRenderer, &text2DShaderDesc, &gFontstash.pShaders[0]);
             addShader(gFontstash.pRenderer, &text3DShaderDesc, &gFontstash.pShaders[1]);

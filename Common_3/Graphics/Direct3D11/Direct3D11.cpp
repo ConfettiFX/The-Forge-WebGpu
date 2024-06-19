@@ -1341,11 +1341,14 @@ void d3d11_initRendererContext(const char* appName, const RendererContextDesc* p
         SAFE_RELEASE(gpuDesc[i].pGpu);
 
         gpu->mSettings.mUniformBufferAlignment = 256;
+        gpu->mSettings.mUploadBufferAlignment = 1;
         gpu->mSettings.mUploadBufferTextureAlignment = 1;
         gpu->mSettings.mUploadBufferTextureRowAlignment = 1;
-        gpu->mSettings.mMultiDrawIndirect = false; // no such thing
+        gpu->mSettings.mMultiDrawIndirect = false;      // no such thing
+        gpu->mSettings.mMultiDrawIndirectCount = false; // no such thing
         gpu->mSettings.mMaxVertexInputBindings = 32U;
         gpu->mSettings.mMaxBoundTextures = 128;
+        gpu->mSettings.mRootConstant = false;
         gpu->mSettings.mIndirectRootConstant = false;
         gpu->mSettings.mBuiltinDrawID = false;
         gpu->mSettings.mTimestampQueries = true;

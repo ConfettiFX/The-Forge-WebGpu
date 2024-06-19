@@ -416,18 +416,34 @@ void captureScreenshot(SwapChain* pSwapChain, uint32_t swapChainRtIndex, bool no
     waitQueueIdle(pCmdPool->pQueue);
 
     // Allocate temp space
-    uint16_t byteSize = (uint16_t)TinyImageFormat_BitSizeOfBlock(pRenderTarget->mFormat) / 8;
-    uint8_t  channelCount = (uint8_t)TinyImageFormat_ChannelCount(pRenderTarget->mFormat);
-    uint32_t size = pRenderTarget->mWidth * pRenderTarget->mHeight * max((uint16_t)4U, byteSize);
-    uint8_t* alloc = (uint8_t*)tf_malloc(size);
+    const uint32_t rowAlignment = max(1u, pRendererRef->pGpu->mSettings.mUploadBufferTextureRowAlignment);
+    uint16_t       byteSize = (uint16_t)TinyImageFormat_BitSizeOfBlock(pRenderTarget->mFormat) / 8;
+    uint8_t        channelCount = (uint8_t)TinyImageFormat_ChannelCount(pRenderTarget->mFormat);
+    uint32_t       size = round_up(pRenderTarget->mWidth * pRenderTarget->mHeight * max((uint16_t)4U, byteSize), rowAlignment);
+    uint8_t*       alloc = (uint8_t*)tf_malloc(size);
 
     resetCmdPool(pRendererRef, pCmdPool);
 
     // Generate image data buffer.
     mapRenderTarget(pRendererRef, pCmdPool->pQueue, gCmd, pRenderTarget, RESOURCE_STATE_PRESENT, alloc);
 
+    saveRenderTargetDataToPng(pSwapChain, pRenderTarget, alloc, byteSize, channelCount, gScreenshotName, noAlpha, forceFlipRedBlue);
+
+    tf_free(alloc);
+
+#if defined(METAL)
+    layer.framebufferOnly = true;
+#endif
+
+    gCaptureFlag = false;
+    updateUIVisibility();
+}
+
+void saveRenderTargetDataToPng(SwapChain* pSwapChain, RenderTarget* pRenderTarget, uint8_t* alloc, uint32_t byteSize, uint8_t channelCount,
+                               char* screenShotName, bool noAlpha, bool forceFlipRedBlue)
+{
     char screenshotFileName[FS_MAX_PATH] = {};
-    strcat(screenshotFileName, gScreenshotName);
+    strcat(screenshotFileName, screenShotName);
     strcat(screenshotFileName, (COLOR_SPACE_SDR_SRGB < pSwapChain->mColorSpace) ? ".hdr" : ".png");
     void* pEncoded = NULL;
     int   encodedSize = 0;
@@ -505,18 +521,10 @@ void captureScreenshot(SwapChain* pSwapChain, uint32_t swapChainRtIndex, bool no
     }
     else
     {
-        LOGF(eERROR, "Failed to open file for a screenshot: %s", gScreenshotName);
+        LOGF(eERROR, "Failed to open file for a screenshot: %s", screenShotName);
     }
 
-    tf_free(alloc);
     tf_free(pEncoded);
-
-#if defined(METAL)
-    layer.framebufferOnly = true;
-#endif
-
-    gCaptureFlag = false;
-    updateUIVisibility();
 }
 
 void exitScreenshotInterface()

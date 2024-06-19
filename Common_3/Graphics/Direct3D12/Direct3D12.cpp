@@ -1971,9 +1971,11 @@ void QueryGPUSettings(ID3D12Device* pDevice, const GpuDesc* pGpuDesc, GPUSetting
     GPUSettings& gpuSettings = *pSettings;
     setDefaultGPUSettings(pSettings);
     gpuSettings.mUniformBufferAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+    gpuSettings.mUploadBufferAlignment = 1;
     gpuSettings.mUploadBufferTextureAlignment = D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT;
     gpuSettings.mUploadBufferTextureRowAlignment = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
     gpuSettings.mMultiDrawIndirect = true;
+    gpuSettings.mMultiDrawIndirectCount = true;
     gpuSettings.mMaxVertexInputBindings = 32U;
 
     // assign device ID
@@ -2007,6 +2009,7 @@ void QueryGPUSettings(ID3D12Device* pDevice, const GpuDesc* pGpuDesc, GPUSetting
 
     gpuSettings.mGpuMarkers = true;
     gpuSettings.mHDRSupported = true;
+    gpuSettings.mRootConstant = true;
     gpuSettings.mIndirectRootConstant = true;
     gpuSettings.mBuiltinDrawID = false;
     gpuSettings.mTimestampQueries = true;

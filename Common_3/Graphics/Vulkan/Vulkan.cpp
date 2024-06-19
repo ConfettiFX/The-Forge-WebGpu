@@ -2262,17 +2262,17 @@ uint32_t util_get_memory_type(uint32_t typeBits, const VkPhysicalDeviceMemoryPro
 }
 
 // Determines pipeline stages involved for given accesses
-VkPipelineStageFlags util_determine_pipeline_stage_flags(Renderer* pRenderer, VkAccessFlags accessFlags, QueueType queueType)
+static inline FORGE_CONSTEXPR VkPipelineStageFlags ToPipelineStageFlags(Renderer* pRenderer, ResourceState state, QueueType queueType)
 {
     VkPipelineStageFlags flags = 0;
 
     if (pRenderer->pGpu->mSettings.mRaytracingSupported)
     {
-        if (accessFlags & (VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR))
+        if (state & (RESOURCE_STATE_ACCELERATION_STRUCTURE_READ))
         {
             flags |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
         }
-        if (accessFlags & (VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR))
+        if (state & (RESOURCE_STATE_ACCELERATION_STRUCTURE_WRITE))
         {
             flags |= VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
         }
@@ -2282,13 +2282,23 @@ VkPipelineStageFlags util_determine_pipeline_stage_flags(Renderer* pRenderer, Vk
     {
     case QUEUE_TYPE_GRAPHICS:
     {
-        if ((accessFlags & (VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)) != 0)
+        if (state & RESOURCE_STATE_INDEX_BUFFER)
+        {
             flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-
-        if ((accessFlags & (VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)) != 0)
+        }
+        if (state & RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)
+        {
+            flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+        }
+        if (state & RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+        {
+            flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+        if (state & RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
         {
             flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
-            flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             if (pRenderer->pGpu->mSettings.mGeometryShaderSupported)
             {
                 flags |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
@@ -2298,60 +2308,58 @@ VkPipelineStageFlags util_determine_pipeline_stage_flags(Renderer* pRenderer, Vk
                 flags |= VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT;
                 flags |= VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
             }
-            flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
             if (pRenderer->pGpu->mSettings.mRayPipelineSupported)
             {
                 flags |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
             }
         }
-
-        if ((accessFlags & VK_ACCESS_INPUT_ATTACHMENT_READ_BIT) != 0)
+        if (state & RESOURCE_STATE_UNORDERED_ACCESS)
+        {
+            flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            // #TODO: Split into different state
             flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-        if ((accessFlags & (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)) != 0)
+        }
+        if (state & RESOURCE_STATE_RENDER_TARGET)
+        {
             flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-        if ((accessFlags & (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
+        }
+        if (state & (RESOURCE_STATE_DEPTH_READ | RESOURCE_STATE_DEPTH_WRITE))
+        {
             flags |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-
+        }
 #if defined(QUEST_VR)
-        if ((accessFlags & VK_ACCESS_FRAGMENT_DENSITY_MAP_READ_BIT_EXT) != 0)
+        if (state & RESOURCE_STATE_SHADING_RATE_SOURCE)
+        {
             flags |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+        }
 #endif
         break;
     }
     case QUEUE_TYPE_COMPUTE:
     {
-        if ((accessFlags & (VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT)) != 0 ||
-            (accessFlags & VK_ACCESS_INPUT_ATTACHMENT_READ_BIT) != 0 ||
-            (accessFlags & (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)) != 0 ||
-            (accessFlags & (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
-            return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-        if ((accessFlags & (VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)) != 0)
-            flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-        break;
+        flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     }
     case QUEUE_TYPE_TRANSFER:
+    {
         return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    }
     default:
         break;
     }
 
     // Compatible with both compute and graphics queues
-    if ((accessFlags & VK_ACCESS_INDIRECT_COMMAND_READ_BIT) != 0)
+    if (state & RESOURCE_STATE_INDIRECT_ARGUMENT)
+    {
         flags |= VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-
-    if ((accessFlags & (VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT)) != 0)
+    }
+    if (state & (RESOURCE_STATE_COPY_DEST | RESOURCE_STATE_COPY_SOURCE))
+    {
         flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-    if ((accessFlags & (VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT)) != 0)
-        flags |= VK_PIPELINE_STAGE_HOST_BIT;
-
+    }
     if (flags == 0)
+    {
         flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    }
 
     return flags;
 }
@@ -2888,15 +2896,18 @@ static bool QueryGpuSettings(const RendererContextDesc* pDesc, RendererContext* 
 #endif
 
     pGpu->mSettings.mUniformBufferAlignment = (uint32_t)gpuProperties.properties.limits.minUniformBufferOffsetAlignment;
+    pGpu->mSettings.mUploadBufferAlignment = 1;
     pGpu->mSettings.mUploadBufferTextureAlignment = (uint32_t)gpuProperties.properties.limits.optimalBufferCopyOffsetAlignment;
     pGpu->mSettings.mUploadBufferTextureRowAlignment = (uint32_t)gpuProperties.properties.limits.optimalBufferCopyRowPitchAlignment;
     pGpu->mSettings.mMaxVertexInputBindings = gpuProperties.properties.limits.maxVertexInputBindings;
     pGpu->mSettings.mMultiDrawIndirect = gpuFeatures2.features.multiDrawIndirect;
+    pGpu->mSettings.mMultiDrawIndirectCount = pGpu->mVk.mDrawIndirectCountExtension || pGpu->mVk.mAMDDrawIndirectCountExtension;
     pGpu->mSettings.mMaxBoundTextures = gpuProperties.properties.limits.maxPerStageDescriptorSampledImages;
     pGpu->mSettings.mMaxTotalComputeThreads = gpuProperties.properties.limits.maxComputeWorkGroupInvocations;
     COMPILE_ASSERT(sizeof(pGpu->mSettings.mMaxComputeThreads) == sizeof(gpuProperties.properties.limits.maxComputeWorkGroupSize));
     memcpy(pGpu->mSettings.mMaxComputeThreads, gpuProperties.properties.limits.maxComputeWorkGroupSize,
            sizeof(gpuProperties.properties.limits.maxComputeWorkGroupSize));
+    pGpu->mSettings.mRootConstant = true;
     pGpu->mSettings.mIndirectRootConstant = false;
     pGpu->mSettings.mBuiltinDrawID = true;
     pGpu->mSettings.mTimestampQueries =
@@ -4940,15 +4951,8 @@ void vk_addSwapChain(Renderer* pRenderer, const SwapChainDesc* pDesc, SwapChain*
     modes = (VkPresentModeKHR*)alloca(presentModeCount * sizeof(*modes));
     CHECK_VKRESULT_INSTANCE(vkGetPhysicalDeviceSurfacePresentModesKHR(pRenderer->pGpu->mVk.pGpu, vkSurface, &presentModeCount, modes));
 
-    VkPresentModeKHR preferredModeList[] = {
-        VK_PRESENT_MODE_IMMEDIATE_KHR,
-#if !defined(ANDROID) && !defined(NX64)
-        // Bad for thermal
-        VK_PRESENT_MODE_MAILBOX_KHR,
-#endif
-        VK_PRESENT_MODE_FIFO_RELAXED_KHR,
-        VK_PRESENT_MODE_FIFO_KHR
-    };
+    VkPresentModeKHR preferredModeList[] = { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+                                             VK_PRESENT_MODE_FIFO_KHR };
 
     const uint32_t preferredModeCount = TF_ARRAY_COUNT(preferredModeList);
     const uint32_t preferredModeStartIndex = pDesc->mEnableVsync ? (preferredModeCount - 2) : 0;
@@ -8658,6 +8662,9 @@ void vk_cmdResourceBarrier(Cmd* pCmd, uint32_t numBufferBarriers, BufferBarrier*
     VkAccessFlags srcAccessFlags = 0;
     VkAccessFlags dstAccessFlags = 0;
 
+    VkPipelineStageFlags srcStageMask = 0;
+    VkPipelineStageFlags dstStageMask = 0;
+
     for (uint32_t i = 0; i < numBufferBarriers; ++i)
     {
         BufferBarrier* pTrans = &pBufferBarriers[i];
@@ -8675,6 +8682,8 @@ void vk_cmdResourceBarrier(Cmd* pCmd, uint32_t numBufferBarriers, BufferBarrier*
 
         srcAccessFlags |= memoryBarrier.srcAccessMask;
         dstAccessFlags |= memoryBarrier.dstAccessMask;
+        srcStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mCurrentState, (QueueType)pCmd->mVk.mType);
+        dstStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mNewState, (QueueType)pCmd->mVk.mType);
     }
 
     for (uint32_t i = 0; i < numTextureBarriers; ++i)
@@ -8734,6 +8743,8 @@ void vk_cmdResourceBarrier(Cmd* pCmd, uint32_t numBufferBarriers, BufferBarrier*
 
             srcAccessFlags |= pImageBarrier->srcAccessMask;
             dstAccessFlags |= pImageBarrier->dstAccessMask;
+            srcStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mCurrentState, (QueueType)pCmd->mVk.mType);
+            dstStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mNewState, (QueueType)pCmd->mVk.mType);
         }
     }
 
@@ -8794,11 +8805,10 @@ void vk_cmdResourceBarrier(Cmd* pCmd, uint32_t numBufferBarriers, BufferBarrier*
 
             srcAccessFlags |= pImageBarrier->srcAccessMask;
             dstAccessFlags |= pImageBarrier->dstAccessMask;
+            srcStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mCurrentState, (QueueType)pCmd->mVk.mType);
+            dstStageMask |= ToPipelineStageFlags(pCmd->pRenderer, pTrans->mNewState, (QueueType)pCmd->mVk.mType);
         }
     }
-
-    VkPipelineStageFlags srcStageMask = util_determine_pipeline_stage_flags(pCmd->pRenderer, srcAccessFlags, (QueueType)pCmd->mVk.mType);
-    VkPipelineStageFlags dstStageMask = util_determine_pipeline_stage_flags(pCmd->pRenderer, dstAccessFlags, (QueueType)pCmd->mVk.mType);
 
     if (srcAccessFlags || dstAccessFlags)
     {
@@ -9293,6 +9303,7 @@ void vk_getFenceStatus(Renderer* pRenderer, Fence* pFence, FenceStatus* pFenceSt
     VkResult vkRes = vkGetFenceStatus(pRenderer->mVk.pDevice, pFence->mVk.pFence);
     *pFenceStatus = vkRes == VK_SUCCESS ? FENCE_STATUS_COMPLETE : FENCE_STATUS_INCOMPLETE;
 }
+
 /************************************************************************/
 // Utility functions
 /************************************************************************/

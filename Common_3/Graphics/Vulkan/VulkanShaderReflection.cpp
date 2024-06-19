@@ -54,6 +54,57 @@ static TextureDimension sSPIRV_TO_RESOURCE_DIM[SPIRV_DIM_COUNT] = {
     TEXTURE_DIM_2DMS,      TEXTURE_DIM_2DMS_ARRAY, TEXTURE_DIM_3D, TEXTURE_DIM_CUBE,     TEXTURE_DIM_CUBE_ARRAY,
 };
 
+static TextureAccess sSPIRV_TO_ACCESS[SPIRV_TYPE_COUNT] = {
+    TEXTURE_ACCESS_READONLY,
+    TEXTURE_ACCESS_WRITEONLY,
+    TEXTURE_ACCESS_READWRITE,
+};
+
+static TinyImageFormat sSPIRV_TO_IMAGE_FORMAT[SPIRV_FORMAT_COUNT] = {
+    TinyImageFormat_UNDEFINED,           // SPIRV_FORMAT_UNKNOWN = 0,
+    TinyImageFormat_R32G32B32A32_SFLOAT, // SPIRV_FORMAT_RGBA32F = 1,
+    TinyImageFormat_R16G16B16A16_SFLOAT, // SPIRV_FORMAT_RGBA16F = 2,
+    TinyImageFormat_R32_SFLOAT,          // SPIRV_FORMAT_R32F = 3,
+    TinyImageFormat_R8G8B8A8_UNORM,      // SPIRV_FORMAT_RGBA8 = 4,
+    TinyImageFormat_R8G8B8A8_SNORM,      // SPIRV_FORMAT_RGBA8SNORM = 5,
+    TinyImageFormat_R32G32_SFLOAT,       // SPIRV_FORMAT_RG32F = 6,
+    TinyImageFormat_R16G16_SFLOAT,       // SPIRV_FORMAT_RG16F = 7,
+    TinyImageFormat_B10G11R11_UFLOAT,    // SPIRV_FORMAT_R11FG11FB10F = 8,
+    TinyImageFormat_R16_SFLOAT,          // SPIRV_FORMAT_R16F = 9,
+    TinyImageFormat_R16G16B16A16_UNORM,  // SPIRV_FORMAT_RGBA16 = 10,
+    TinyImageFormat_R10G10B10A2_UNORM,   // SPIRV_FORMAT_RGB10A2 = 11,
+    TinyImageFormat_R16G16_UNORM,        // SPIRV_FORMAT_RG16 = 12,
+    TinyImageFormat_R8G8_UNORM,          // SPIRV_FORMAT_RG8 = 13,
+    TinyImageFormat_R16_UNORM,           // SPIRV_FORMAT_R16 = 14,
+    TinyImageFormat_R8_UNORM,            // SPIRV_FORMAT_R8 = 15,
+    TinyImageFormat_R16G16B16A16_SNORM,  // SPIRV_FORMAT_RGBA16SNORM = 16,
+    TinyImageFormat_R16G16_UNORM,        // SPIRV_FORMAT_RG16SNORM = 17,
+    TinyImageFormat_R8G8_SNORM,          // SPIRV_FORMAT_RG8SNORM = 18,
+    TinyImageFormat_R16_SNORM,           // SPIRV_FORMAT_R16SNORM = 19,
+    TinyImageFormat_R8_SNORM,            // SPIRV_FORMAT_R8SNORM = 20,
+    TinyImageFormat_R32G32B32A32_SINT,   // SPIRV_FORMAT_RGBA32I = 21,
+    TinyImageFormat_R16G16B16A16_SINT,   // SPIRV_FORMAT_RGBA16I = 22,
+    TinyImageFormat_R8G8B8A8_SINT,       // SPIRV_FORMAT_RGBA8I = 23,
+    TinyImageFormat_R32_SINT,            // SPIRV_FORMAT_R32I = 24,
+    TinyImageFormat_R32G32_SINT,         // SPIRV_FORMAT_RG32I = 25,
+    TinyImageFormat_R16G16_SINT,         // SPIRV_FORMAT_RG16I = 26,
+    TinyImageFormat_R8G8_SINT,           // SPIRV_FORMAT_RG8I = 27,
+    TinyImageFormat_R16_SINT,            // SPIRV_FORMAT_R16I = 28,
+    TinyImageFormat_R8_SINT,             // SPIRV_FORMAT_R8I = 29,
+    TinyImageFormat_R32G32B32A32_UINT,   // SPIRV_FORMAT_RGBA32UI = 30,
+    TinyImageFormat_R16G16B16A16_UINT,   // SPIRV_FORMAT_RGBA16UI = 31,
+    TinyImageFormat_R8G8B8A8_UINT,       // SPIRV_FORMAT_RGBA8UI = 32,
+    TinyImageFormat_R32_UINT,            // SPIRV_FORMAT_R32UI = 33,
+    TinyImageFormat_R10G10B10A2_UINT,    // SPIRV_FORMAT_RGB10A2UI = 34,
+    TinyImageFormat_R32G32_UINT,         // SPIRV_FORMAT_RG32UI = 35,
+    TinyImageFormat_R16G16_UINT,         // SPIRV_FORMAT_RG16UI = 36,
+    TinyImageFormat_R8G8_UINT,           // SPIRV_FORMAT_RG8UI = 37,
+    TinyImageFormat_R16_UINT,            // SPIRV_FORMAT_R16UI = 38,
+    TinyImageFormat_R8_UINT,             // SPIRV_FORMAT_R8UI = 39,
+    TinyImageFormat_R64_UINT,            // SPIRV_FORMAT_R64UI = 40,
+    TinyImageFormat_R64_SINT,            // SPIRV_FORMAT_R64I = 41,
+};
+
 bool filterResource(SPIRV_Resource* resource, ShaderStage currentStage)
 {
     bool filter = false;
@@ -209,6 +260,8 @@ void vk_createShaderReflection(const uint8_t* shaderCode, uint32_t shaderSize, S
                 pResources[j].name = pCurrentName;
                 pResources[j].name_size = resource->name_size;
                 pResources[j].dim = sSPIRV_TO_RESOURCE_DIM[resource->dim];
+                pResources[j].access = sSPIRV_TO_ACCESS[resource->dim];
+                pResources[j].format = sSPIRV_TO_IMAGE_FORMAT[resource->format];
                 // we dont own the names memory we need to copy it to the name pool
                 memcpy(pCurrentName, resource->name, resource->name_size);
                 pCurrentName += resource->name_size + 1;

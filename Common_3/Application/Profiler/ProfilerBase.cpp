@@ -1319,8 +1319,7 @@ float2 cmdDrawGpuProfile(Cmd* pCmd, float2 screenCoordsInPx, ProfileToken nProfi
 #ifdef ENABLE_FORGE_FONTS
     ASSERT(pDrawDesc);
 
-    GpuProfiler* pGpuProfiler = getGpuProfiler(nProfileToken);
-    if (!pGpuProfiler || !gProfilerDrawingEnabled)
+    if (!gProfilerDrawingEnabled)
     {
         return float2(0.f, 0.f);
     }
@@ -1332,6 +1331,13 @@ float2 cmdDrawGpuProfile(Cmd* pCmd, float2 screenCoordsInPx, ProfileToken nProfi
 
     float2 totalTextSizePx = fntMeasureFontText(gGpuProfileTitleText, pDrawDesc);
     gScreenPos.y += totalTextSizePx.y + gDefaultGpuProfileDrawDesc.mHeightOffset;
+
+    GpuProfiler* pGpuProfiler = getGpuProfiler(nProfileToken);
+    if (!pGpuProfiler)
+    {
+        return totalTextSizePx;
+    }
+
     drawGpuProfileRecursive(pCmd, pGpuProfiler, pDrawDesc, gScreenPos, 0, totalTextSizePx);
 
     return totalTextSizePx;

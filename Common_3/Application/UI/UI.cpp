@@ -108,6 +108,7 @@ typedef struct UserInterface
     uint32_t       mDynamicTexturesCount = 0;
     Shader*        pShaderTextured[SAMPLE_COUNT_COUNT] = { NULL };
     RootSignature* pRootSignatureTextured = NULL;
+    RootSignature* pRootSignatureTexturedMs = NULL;
     DescriptorSet* pDescriptorSetUniforms = NULL;
     DescriptorSet* pDescriptorSetTexture = NULL;
     Pipeline*      pPipelineTextured[SAMPLE_COUNT_COUNT] = { NULL };
@@ -2885,8 +2886,8 @@ static void cmdPrepareRenderingForUI(Cmd* pCmd, const float2& displayPos, const 
 }
 
 static void cmdDrawUICommand(Cmd* pCmd, const UserInterfaceDrawCommand* pImDrawCmd, const float2& displayPos, const float2& displaySize,
-                             Pipeline** ppPipelineInOut, Pipeline** ppPrevPipelineInOut, int32_t& globalVtxOffsetInOut,
-                             int32_t& globalIdxOffsetInOut, uint32_t& prevSetIndexInOut)
+                             Pipeline** ppPipelineInOut, Pipeline** ppPrevPipelineInOut, uint32_t& globalVtxOffsetInOut,
+                             uint32_t& globalIdxOffsetInOut, uint32_t& prevSetIndexInOut)
 {
     // for (uint32_t i = 0; i < (uint32_t)pCmdList->CmdBuffer.size(); i++)
     //{
@@ -2963,10 +2964,13 @@ static void cmdDrawUICommand(Cmd* pCmd, const UserInterfaceDrawCommand* pImDrawC
         prevSetIndexInOut = setIndex;
     }
 
+    const uint32_t vtxSize =
+        round_up(pImDrawCmd->mVertexCount * sizeof(ImDrawVert), pCmd->pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+    const uint32_t idxSize = round_up(pImDrawCmd->mIndexCount * sizeof(ImDrawIdx), pCmd->pRenderer->pGpu->mSettings.mUploadBufferAlignment);
     cmdDrawIndexed(pCmd, pImDrawCmd->mElemCount, pImDrawCmd->mIndexOffset + globalIdxOffsetInOut,
                    pImDrawCmd->mVertexOffset + globalVtxOffsetInOut);
-    globalIdxOffsetInOut += pImDrawCmd->mIndexCount;
-    globalVtxOffsetInOut += pImDrawCmd->mVertexCount;
+    globalIdxOffsetInOut += idxSize / sizeof(ImDrawIdx);
+    globalVtxOffsetInOut += round_up(vtxSize, sizeof(ImDrawVert)) / sizeof(ImDrawVert);
 }
 
 #endif // ENABLE_FORGE_UI
@@ -3128,11 +3132,15 @@ void loadUserInterface(const UserInterfaceLoadDesc* pDesc)
             }
 
             const char*       pStaticSamplerNames[] = { "uSampler" };
-            RootSignatureDesc textureRootDesc = { pUserInterface->pShaderTextured, TF_ARRAY_COUNT(pUserInterface->pShaderTextured) };
+            RootSignatureDesc textureRootDesc = { pUserInterface->pShaderTextured, 1 };
             textureRootDesc.mStaticSamplerCount = 1;
             textureRootDesc.ppStaticSamplerNames = pStaticSamplerNames;
             textureRootDesc.ppStaticSamplers = &pUserInterface->pDefaultSampler;
             addRootSignature(pUserInterface->pRenderer, &textureRootDesc, &pUserInterface->pRootSignatureTextured);
+
+            textureRootDesc.mShaderCount = TF_ARRAY_COUNT(pUserInterface->pShaderTextured) - 1;
+            textureRootDesc.ppShaders = pUserInterface->pShaderTextured + 1;
+            addRootSignature(pUserInterface->pRenderer, &textureRootDesc, &pUserInterface->pRootSignatureTexturedMs);
 
             DescriptorSetDesc setDesc = { pUserInterface->pRootSignatureTextured, DESCRIPTOR_UPDATE_FREQ_PER_BATCH,
                                           pUserInterface->mMaxUIFonts +
@@ -3186,6 +3194,10 @@ void loadUserInterface(const UserInterfaceLoadDesc* pDesc)
         for (uint32_t s = 0; s < TF_ARRAY_COUNT(pUserInterface->pShaderTextured); ++s)
         {
             pipelineDesc.pShaderProgram = pUserInterface->pShaderTextured[s];
+            if (s > 0)
+            {
+                pipelineDesc.pRootSignature = pUserInterface->pRootSignatureTexturedMs;
+            }
             addPipeline(pUserInterface->pRenderer, &desc, &pUserInterface->pPipelineTextured[s]);
         }
     }
@@ -3239,6 +3251,7 @@ void unloadUserInterface(uint32_t unloadType)
             removeDescriptorSet(pUserInterface->pRenderer, pUserInterface->pDescriptorSetTexture);
             removeDescriptorSet(pUserInterface->pRenderer, pUserInterface->pDescriptorSetUniforms);
             removeRootSignature(pUserInterface->pRenderer, pUserInterface->pRootSignatureTextured);
+            removeRootSignature(pUserInterface->pRenderer, pUserInterface->pRootSignatureTexturedMs);
         }
     }
 #endif
@@ -3325,7 +3338,10 @@ void cmdDrawUserInterface(Cmd* pCmd, UserInterfaceDrawData* pUIDrawData)
     uint64_t vtxDst = vOffset;
     uint64_t idxDst = iOffset;
 
-    if (pUIDrawData->mVertexBufferData && pUIDrawData->mIndexBufferData)
+    // Use regular draws for client
+    const bool isRemoteServer = pUIDrawData;
+
+    if (isRemoteServer && pUIDrawData->mVertexBufferData && pUIDrawData->mIndexBufferData)
     {
         BufferUpdateDesc update = { pUserInterface->pVertexBuffer, vOffset };
         beginUpdateResource(&update);
@@ -3344,18 +3360,23 @@ void cmdDrawUserInterface(Cmd* pCmd, UserInterfaceDrawData* pUIDrawData)
         for (int32_t i = 0; i < pImDrawData->CmdListsCount; i++)
         {
             const ImDrawList* pCmdList = pImDrawData->CmdLists[i];
-            BufferUpdateDesc  update = { pUserInterface->pVertexBuffer, vtxDst };
+            const uint64_t    vtxSize =
+                round_up_64(pCmdList->VtxBuffer.size() * sizeof(ImDrawVert), pCmd->pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+            const uint64_t idxSize =
+                round_up_64(pCmdList->IdxBuffer.size() * sizeof(ImDrawIdx), pCmd->pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+            BufferUpdateDesc update = { pUserInterface->pVertexBuffer, vtxDst, vtxSize };
             beginUpdateResource(&update);
             memcpy(update.pMappedData, pCmdList->VtxBuffer.Data, pCmdList->VtxBuffer.size() * sizeof(ImDrawVert));
             endUpdateResource(&update);
 
-            update = { pUserInterface->pIndexBuffer, idxDst };
+            update = { pUserInterface->pIndexBuffer, idxDst, idxSize };
             beginUpdateResource(&update);
             memcpy(update.pMappedData, pCmdList->IdxBuffer.Data, pCmdList->IdxBuffer.size() * sizeof(ImDrawIdx));
             endUpdateResource(&update);
 
-            vtxDst += (pCmdList->VtxBuffer.size() * sizeof(ImDrawVert));
-            idxDst += (pCmdList->IdxBuffer.size() * sizeof(ImDrawIdx));
+            // Round up in case the buffer alignment is not a multiple of vertex/index size
+            vtxDst += round_up_64(vtxSize, sizeof(ImDrawVert));
+            idxDst += round_up_64(idxSize, sizeof(ImDrawIdx));
         }
     }
 
@@ -3366,8 +3387,8 @@ void cmdDrawUserInterface(Cmd* pCmd, UserInterfaceDrawData* pUIDrawData)
     cmdPrepareRenderingForUI(pCmd, displayPos, displaySize, pPipeline, vOffset, iOffset);
 
     // Render command lists
-    int32_t globalVtxOffset = 0;
-    int32_t globalIdxOffset = 0;
+    uint32_t globalVtxOffset = 0;
+    uint32_t globalIdxOffset = 0;
 
     if (pUIDrawData->mDrawCommands)
     {

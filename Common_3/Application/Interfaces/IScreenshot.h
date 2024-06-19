@@ -33,6 +33,8 @@ FORGE_API bool prepareScreenshot(SwapChain* pSwapChain);
 
 // Attempts to capture a screenshot if setCaptureScreenshot was called for this frame
 FORGE_API void captureScreenshot(SwapChain* pSwapChain, uint32_t swapChainRtIndex, bool noAlpha, bool forceFlipRedBlue);
+FORGE_API void saveRenderTargetDataToPng(SwapChain* pSwapChain, RenderTarget* pRenderTarget, uint8_t* alloc, uint32_t byteSize,
+                                         uint8_t channelCount, char* screenShotName, bool noAlpha, bool forceFlipRedBlue);
 
 FORGE_API void exitScreenshotInterface();
 

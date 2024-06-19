@@ -2065,11 +2065,14 @@ static void QueryGPUSettings(GpuInfo* gpuInfo, GPUSettings* pOutSettings)
     ASSERT(pOutSettings->mVRAM);
 
     pOutSettings->mUniformBufferAlignment = 256;
+    pOutSettings->mUploadBufferAlignment = 1;
     pOutSettings->mUploadBufferTextureAlignment = 16;
     pOutSettings->mUploadBufferTextureRowAlignment = 1;
     pOutSettings->mMaxVertexInputBindings =
-        MAX_VERTEX_BINDINGS;                  // there are no special vertex buffers for input in Metal, only regular buffers
-    pOutSettings->mMultiDrawIndirect = false; // multi draw indirect is not supported on Metal: only single draw indirect
+        MAX_VERTEX_BINDINGS;                       // there are no special vertex buffers for input in Metal, only regular buffers
+    pOutSettings->mMultiDrawIndirect = false;      // multi draw indirect is not supported on Metal: only single draw indirect
+    pOutSettings->mMultiDrawIndirectCount = false; // multi draw indirect is not supported on Metal: only single draw indirect
+    pOutSettings->mRootConstant = true;
     pOutSettings->mIndirectRootConstant = false;
     pOutSettings->mBuiltinDrawID = false;
     if (MTL_HDR_SUPPORTED)

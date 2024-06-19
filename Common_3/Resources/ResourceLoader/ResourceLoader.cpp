@@ -93,7 +93,7 @@ struct SubresourceDataDesc
     uint64_t mSrcOffset;
     uint32_t mMipLevel;
     uint32_t mArrayLayer;
-#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN)
+#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN) || defined(WEBGPU)
     uint32_t mRowPitch;
     uint32_t mSlicePitch;
 #endif
@@ -997,6 +997,15 @@ static Cmd* acquireCmd(CopyEngine* pCopyEngine)
         cmdBeginDebugMarker(resourceSet.pCmd, 1.0f, 0.5f, 0.1f,
                             QUEUE_TYPE_TRANSFER == pCopyEngine->pQueue->mType ? "Copy Cmd" : "Upload Cmd");
 #endif
+#if defined(WEBGPU)
+        if (gPlatformParameters.mSelectedRendererApi == RENDERER_API_WEBGPU)
+        {
+            if (!resourceSet.mBuffer->pCpuMappedAddress)
+            {
+                mapBuffer(resourceSet.pCmd->pRenderer, resourceSet.mBuffer, NULL);
+            }
+        }
+#endif
         pCopyEngine->isRecording = true;
     }
     return resourceSet.pCmd;
@@ -1031,6 +1040,16 @@ static void streamerFlush(CopyEngine* pCopyEngine)
         cmdEndDebugMarker(resourceSet.pCmd);
 #endif
         endCmd(resourceSet.pCmd);
+#if defined(WEBGPU)
+        if (RENDERER_API_WEBGPU == gPlatformParameters.mSelectedRendererApi)
+        {
+            unmapBuffer(resourceSet.pCmd->pRenderer, resourceSet.mBuffer);
+            for (ptrdiff_t i = 0; i < arrlen(resourceSet.mTempBuffers); ++i)
+            {
+                unmapBuffer(resourceSet.pCmd->pRenderer, resourceSet.mTempBuffers[i]);
+            }
+        }
+#endif
         QueueSubmitDesc submitDesc = {};
         submitDesc.mCmdCount = 1;
         submitDesc.ppCmds = &resourceSet.pCmd;
@@ -1071,12 +1090,14 @@ static MappedMemoryRange allocateStagingMemory(CopyEngine* pCopyEngine, uint64_t
     acquireCmd(pCopyEngine);
 
     CopyResourceSet* pResourceSet = &pCopyEngine->resourceSets[pCopyEngine->activeSet];
+    Renderer*        pRenderer = pResourceLoader->ppRenderers[nodeIndex];
     uint64_t         size = (uint64_t)pResourceSet->mBuffer->mSize;
-    alignment = max((uint32_t)RESOURCE_BUFFER_ALIGNMENT, alignment);
+    alignment = max((uint32_t)pRenderer->pGpu->mSettings.mUploadBufferAlignment, alignment);
     memoryRequirement = round_up_64(memoryRequirement, alignment);
+
     if (memoryRequirement > size)
     {
-        MappedMemoryRange range = allocateUploadMemory(pResourceLoader->ppRenderers[nodeIndex], memoryRequirement, alignment);
+        MappedMemoryRange range = allocateUploadMemory(pRenderer, memoryRequirement, alignment);
         LOADER_LOGF(
             LogLevel::eINFO,
             "Allocating temporary staging buffer. Required allocation size of %llu is larger than the staging buffer capacity of %llu",
@@ -1124,8 +1145,10 @@ static UploadFunctionResult updateBuffer(Renderer* pRenderer, CopyEngine* pCopyE
     }
 
     MappedMemoryRange range = bufUpdateDesc.mInternal.mMappedRange;
-    cmdUpdateBuffer(pCmd, pBuffer, bufUpdateDesc.mDstOffset, range.pBuffer, range.mOffset,
-                    bufUpdateDesc.mSize ? bufUpdateDesc.mSize : range.mSize);
+    uint64_t          size = bufUpdateDesc.mSize ? bufUpdateDesc.mSize : range.mSize;
+    size = min(range.pBuffer->mSize, size);
+    size = round_up_64(size, pRenderer->pGpu->mSettings.mUploadBufferAlignment);
+    cmdUpdateBuffer(pCmd, pBuffer, bufUpdateDesc.mDstOffset, range.pBuffer, range.mOffset, size);
 
     if (IssueBufferCopyBarriers() && bufUpdateDesc.mCurrentState != RESOURCE_STATE_COPY_DEST)
     {
@@ -1159,7 +1182,7 @@ static UploadFunctionResult loadBuffer(Renderer* pRenderer, CopyEngine* pCopyEng
     }
     else
     {
-        range = allocateStagingMemory(pCopyEngine, loadDesc.pBuffer->mSize, RESOURCE_BUFFER_ALIGNMENT, pCopyEngine->nodeIndex);
+        range = allocateStagingMemory(pCopyEngine, loadDesc.pBuffer->mSize, 1, pCopyEngine->nodeIndex);
         if (!range.pData)
         {
             return UPLOAD_FUNCTION_RESULT_STAGING_BUFFER_FULL;
@@ -1185,6 +1208,11 @@ static UploadFunctionResult loadBuffer(Renderer* pRenderer, CopyEngine* pCopyEng
         }
 
         return UPLOAD_FUNCTION_RESULT_COMPLETED;
+    }
+
+    if (mapped)
+    {
+        unmapBuffer(pRenderer, loadDesc.pSrcBuffer);
     }
 
     UploadFunctionResult res = updateBuffer(pRenderer, pCopyEngine, updateDesc);
@@ -1320,7 +1348,7 @@ static UploadFunctionResult updateTexture(Renderer* pRenderer, CopyEngine* pCopy
                 subresourceDesc.mArrayLayer = layer;
                 subresourceDesc.mMipLevel = mip;
                 subresourceDesc.mSrcOffset = upload.mOffset + offset;
-#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN)
+#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN) || defined(WEBGPU)
                 subresourceDesc.mRowPitch = subRowPitch;
                 subresourceDesc.mSlicePitch = subSlicePitch;
 #endif
@@ -1597,7 +1625,7 @@ static void fillGeometryUpdateDesc(Renderer* pRenderer, CopyEngine* pCopyEngine,
     }
     else
     {
-        indexUpdateDesc->mInternal.mMappedRange.pData = (uint8_t*)tf_calloc_memalign(1, RESOURCE_BUFFER_ALIGNMENT, indexUpdateDesc->mSize);
+        indexUpdateDesc->mInternal.mMappedRange.pData = (uint8_t*)tf_calloc_memalign(1, 4, indexUpdateDesc->mSize);
     }
     indexUpdateDesc->pMappedData = indexUpdateDesc->mInternal.mMappedRange.pData;
 
@@ -1650,8 +1678,7 @@ static void fillGeometryUpdateDesc(Renderer* pRenderer, CopyEngine* pCopyEngine,
         }
         else
         {
-            vertexUpdateDesc[i].mInternal.mMappedRange.pData =
-                (uint8_t*)tf_calloc_memalign(1, RESOURCE_BUFFER_ALIGNMENT, vertexUpdateDesc[i].mSize);
+            vertexUpdateDesc[i].mInternal.mMappedRange.pData = (uint8_t*)tf_calloc_memalign(1, 4, vertexUpdateDesc[i].mSize);
         }
         vertexUpdateDesc[i].pMappedData = vertexUpdateDesc[i].mInternal.mMappedRange.pData;
         ++bufferCounter;
@@ -1769,11 +1796,12 @@ static UploadFunctionResult loadGeometryCustomMeshFormat(Renderer* pRenderer, Co
             (uint32_t*)((uint8_t*)geomData->pInverseBindPoses + round_up(geomData->mJointCount * sizeof(*geomData->pInverseBindPoses), 16));
     }
 
+    uint8_t* pUserData = geomData->mJointCount > 0
+                             ? ((uint8_t*)geomData->pJointRemaps + round_up(geomData->mJointCount * sizeof(uint32_t), 16))
+                             : (uint8_t*)(geomData + 1);
     if (geomData->mUserDataSize > 0)
     {
-        geomData->pUserData = geomData->mJointCount > 0
-                                  ? ((uint8_t*)geomData->pJointRemaps + round_up(geomData->mJointCount * sizeof(uint32_t), 16))
-                                  : (uint8_t*)(geomData + 1);
+        geomData->pUserData = pUserData;
     }
 
     // Determine index stride
@@ -1933,8 +1961,7 @@ static UploadFunctionResult loadGeometry(Renderer* pRenderer, CopyEngine* pCopyE
     if (!gUma || (indexUpdateDesc.pMappedData && !indexUpdateDesc.pBuffer->pCpuMappedAddress))
     {
         indexUpdateDesc.mCurrentState = gUma ? indexUpdateDesc.mCurrentState : RESOURCE_STATE_COPY_DEST;
-        indexUpdateDesc.mInternal.mMappedRange =
-            allocateStagingMemory(pCopyEngine, indexUpdateDesc.mSize, RESOURCE_BUFFER_ALIGNMENT, pDesc->mNodeIndex);
+        indexUpdateDesc.mInternal.mMappedRange = allocateStagingMemory(pCopyEngine, indexUpdateDesc.mSize, 1, pDesc->mNodeIndex);
         ASSERT(indexUpdateDesc.pMappedData);
         memcpy(indexUpdateDesc.mInternal.mMappedRange.pData, indexUpdateDesc.pMappedData, indexUpdateDesc.mSize);
         tf_free(indexUpdateDesc.pMappedData);
@@ -1956,7 +1983,7 @@ static UploadFunctionResult loadGeometry(Renderer* pRenderer, CopyEngine* pCopyE
             {
                 vertexUpdateDesc[i].mCurrentState = gUma ? vertexUpdateDesc[i].mCurrentState : RESOURCE_STATE_COPY_DEST;
                 vertexUpdateDesc[i].mInternal.mMappedRange =
-                    allocateStagingMemory(pCopyEngine, vertexUpdateDesc[i].mSize, RESOURCE_BUFFER_ALIGNMENT, pDesc->mNodeIndex);
+                    allocateStagingMemory(pCopyEngine, vertexUpdateDesc[i].mSize, 1, pDesc->mNodeIndex);
                 ASSERT(vertexUpdateDesc[i].pMappedData);
                 memcpy(vertexUpdateDesc[i].mInternal.mMappedRange.pData, vertexUpdateDesc[i].pMappedData, vertexUpdateDesc[i].mSize);
                 tf_free(vertexUpdateDesc[i].pMappedData);
@@ -2010,7 +2037,7 @@ static UploadFunctionResult copyTexture(Renderer* pRenderer, CopyEngine* pCopyEn
     subresourceDesc.mArrayLayer = pTextureCopy.mTextureArrayLayer;
     subresourceDesc.mMipLevel = pTextureCopy.mTextureMipLevel;
     subresourceDesc.mSrcOffset = pTextureCopy.mBufferOffset;
-#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN)
+#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN) || defined(WEBGPU)
     const uint32_t sliceAlignment = util_get_texture_subresource_alignment(pRenderer, fmt);
     const uint32_t rowAlignment = util_get_texture_row_alignment(pRenderer);
     uint32_t       subRowPitch = round_up(rowBytes, rowAlignment);
@@ -3746,10 +3773,10 @@ void beginUpdateResource(BufferUpdateDesc* pBufferUpdate)
         MutexLock         lock(pResourceLoader->mUploadEngineMutex);
         const uint32_t    nodeIndex = pBufferUpdate->pBuffer->mNodeIndex;
         CopyEngine*       pCopyEngine = &pResourceLoader->pUploadEngines[nodeIndex];
-        MappedMemoryRange range = allocateStagingMemory(pCopyEngine, size, RESOURCE_BUFFER_ALIGNMENT, nodeIndex);
+        MappedMemoryRange range = allocateStagingMemory(pCopyEngine, size, 1, nodeIndex);
         if (!range.pData)
         {
-            range = allocateUploadMemory(pRenderer, size, RESOURCE_BUFFER_ALIGNMENT);
+            range = allocateUploadMemory(pRenderer, size, 0);
             arrpush(pCopyEngine->resourceSets[pCopyEngine->activeSet].mTempBuffers, range.pBuffer);
         }
 
@@ -4057,6 +4084,23 @@ static bool load_shader_stage_byte_code(Renderer* pRenderer, const char* name, S
 
                 size = pDerivatives[i].mSize;
 
+#if defined(WEBGPU_NATIVE)
+                // #NOTE: See note in wgpu_addShaderBinary
+                if (gPlatformParameters.mSelectedRendererApi == RENDERER_API_WEBGPU)
+                {
+                    char glslShaderPath[FS_MAX_PATH] = {};
+                    snprintf(glslShaderPath, FS_MAX_PATH, "%s_%u.spv.glsl", binaryShaderPath, i);
+                    FileStream glslFileStream = {};
+                    fsOpenStreamFromPath(RD_SHADER_BINARIES, glslShaderPath, FM_READ, &glslFileStream);
+                    ssize_t glslSize = fsGetStreamFileSize(&glslFileStream);
+                    char* glsl = (char*)tf_malloc(glslSize + 1);
+                    glsl[glslSize] = '\0';
+                    fsReadFromStream(&glslFileStream, glsl, glslSize);
+                    fsCloseStream(&glslFileStream);
+                    pOut->pGlsl = glsl;
+                }
+#endif
+
 #if defined(GLES)
 #if defined(USE_MULTIPLE_RENDER_APIS)
                 if (gPlatformParameters.mSelectedRendererApi == RENDERER_API_GLES)
@@ -4140,6 +4184,17 @@ const char* getShaderPlatformName()
         break;
 #else
     case RENDERER_API_VULKAN:
+        return "VULKAN";
+        break;
+#endif
+#endif
+#if defined(WEBGPU)
+#if defined(__ANDROID__)
+    case RENDERER_API_WEBGPU:
+        return "ANDROID_VULKAN";
+        break;
+#else
+    case RENDERER_API_WEBGPU:
         return "VULKAN";
         break;
 #endif
@@ -4311,6 +4366,24 @@ void addShader(Renderer* pRenderer, const ShaderLoadDesc* pDesc, Shader** ppShad
 
     addShaderBinary(pRenderer, &binaryDesc, ppShader);
     freeShaderByteCode(&shaderByteCodeBuffer, &binaryDesc);
+
+#if defined(WEBGPU_NATIVE)
+    if (gPlatformParameters.mSelectedRendererApi == RENDERER_API_WEBGPU)
+    {
+        if (binaryDesc.mVert.pGlsl)
+        {
+            tf_free(binaryDesc.mVert.pGlsl);
+        }
+        if (binaryDesc.mFrag.pGlsl)
+        {
+            tf_free(binaryDesc.mFrag.pGlsl);
+        }
+        if (binaryDesc.mComp.pGlsl)
+        {
+            tf_free(binaryDesc.mComp.pGlsl);
+        }
+    }
+#endif
 
     Shader* pShader = *ppShader;
 

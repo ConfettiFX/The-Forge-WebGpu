@@ -37,10 +37,18 @@ CBUFFER(uniformBlock_rootcbv, UPDATE_FREQ_NONE, b1, binding = 1)
 RES(Tex2D(float4), uTex0, UPDATE_FREQ_NONE, t2, binding = 2);
 RES(SamplerState, uSampler0, UPDATE_FREQ_NONE, s3, binding = 3);
 
+#if defined(FONTS_NO_PUSH_CONSTANT)
+CBUFFER(uRootCbv, UPDATE_FREQ_NONE, b0, binding = 0)
+{
+	DATA(float4, color, None);
+	DATA(float2, scaleBias, None);
+};
+#else
 PUSH_CONSTANT(uRootConstants, b0)
 {
 	DATA(float4, color, None);
 	DATA(float2, scaleBias, None);
 };
+#endif
 
 #endif

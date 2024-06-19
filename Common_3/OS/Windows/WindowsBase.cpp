@@ -80,13 +80,15 @@ static OSInfo      gOsInfo = {};
 // UI
 static UIComponent* pAPISwitchingComponent = NULL;
 static UIComponent* pToggleVSyncComponent = NULL;
-#if defined(ENABLE_FORGE_RELOAD_SHADER)
-static UIComponent* pReloadShaderComponent = NULL;
-#endif
+
 static UIWidget* pSwitchComponentLabelWidget = NULL;
 static UIWidget* pSelectApUIWidget = NULL;
 static UIWidget* pSelectGraphicCardWidget = NULL;
 static uint32_t  gSelectedApiIndex = 0;
+
+#if defined(ENABLE_FORGE_RELOAD_SHADER)
+static UIComponent* pReloadShaderComponent = NULL;
+#endif
 
 // PickRenderingAPI.cpp
 extern PlatformParameters gPlatformParameters;
@@ -297,6 +299,9 @@ void setupPlatformUI(const IApp::Settings* pSettings)
 #endif
 #if defined(VULKAN)
         "Vulkan",
+#endif
+#if defined(WEBGPU)
+        "WebGpu",
 #endif
 #if defined(DIRECT3D11)
         "D3D11",
