@@ -1,0 +1,159 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Shaders\FSL">
+      <UniqueIdentifier>{41c011d8-d443-4e94-8ef6-3073cbf9ab3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{d3adb09b-d1f4-49e2-b184-9c37e67c4ba8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Culling\Frustum">
+      <UniqueIdentifier>{7078c8a5-11b4-4f9e-be52-e568fb3295f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Culling">
+      <UniqueIdentifier>{b6bc994c-757f-4821-aebe-edd9b0d89c0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Culling\Light">
+      <UniqueIdentifier>{7b3209ef-01ac-4f58-8387-0d99d8e327c9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Culling\Occlusion">
+      <UniqueIdentifier>{7664b867-fc8a-46ce-80ec-dfccd23e256b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Debug">
+      <UniqueIdentifier>{e5bfc1a0-165e-4bd8-b433-c7c2178afb2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Offline">
+      <UniqueIdentifier>{f14d2ee1-5123-4e15-b257-30be3816374e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\PBR">
+      <UniqueIdentifier>{290bbe49-61db-4877-9f83-857ef00812a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\ShadowMapping">
+      <UniqueIdentifier>{2af17bae-f42b-4524-9fc9-ca05b4baf6d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\FSL\Terrain">
+      <UniqueIdentifier>{ff7217ec-4e26-42e5-baf5-b2a59dd90307}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\SunTemple.cpp" />
+    <ClCompile Include="..\src\SunTempleGeometry.cpp" />
+    <FSLShader Include="..\src\Shaders\FSL\blur_resources.h.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Frustum\frustum_cull_pass.comp.fsl">
+      <Filter>Shaders\FSL\Culling\Frustum</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\clear_light_clusters.comp.fsl">
+      <Filter>Shaders\FSL\Culling\Light</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\cluster_lights.comp.fsl">
+      <Filter>Shaders\FSL\Culling\Light</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\light_cull_resources.h.fsl">
+      <Filter>Shaders\FSL\Culling\Light</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_cull_pass.comp.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_depth_pass.frag.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_depth_pass.vert.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_frag_pass.frag.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_pass.comp.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_pass.frag.fsl">
+      <Filter>Shaders\FSL\Culling\Occlusion</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Debug\aabb.frag.fsl">
+      <Filter>Shaders\FSL\Debug</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Debug\aabb.vert.fsl">
+      <Filter>Shaders\FSL\Debug</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Debug\line.frag.fsl">
+      <Filter>Shaders\FSL\Debug</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Debug\line.vert.fsl">
+      <Filter>Shaders\FSL\Debug</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\fullscreen.vert.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\gammaCorrection.frag.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\gaussianBlur.comp.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Offline\brdf.frag.fsl">
+      <Filter>Shaders\FSL\Offline</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Offline\iblCube.vert.fsl">
+      <Filter>Shaders\FSL\Offline</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Offline\ibl_cube_resources.h.fsl">
+      <Filter>Shaders\FSL\Offline</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Offline\irradiance.frag.fsl">
+      <Filter>Shaders\FSL\Offline</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Offline\prefilteredEnv.frag.fsl">
+      <Filter>Shaders\FSL\Offline</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\PBR\pbr.frag.fsl">
+      <Filter>Shaders\FSL\PBR</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\PBR\pbr.vert.fsl">
+      <Filter>Shaders\FSL\PBR</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\PBR\resources_defs.h.fsl">
+      <Filter>Shaders\FSL\PBR</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\PBR\shading.h.fsl">
+      <Filter>Shaders\FSL\PBR</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShaderList.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPass.frag.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPass.vert.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPassAlpha.frag.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPassAlpha.vert.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\shadow_resources.h.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\shadow_resources_defs.h.fsl">
+      <Filter>Shaders\FSL\ShadowMapping</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\skybox.frag.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\skybox.vert.fsl">
+      <Filter>Shaders\FSL</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain.frag.fsl">
+      <Filter>Shaders\FSL\Terrain</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain.vert.fsl">
+      <Filter>Shaders\FSL\Terrain</Filter>
+    </FSLShader>
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain_resources_defs.h.fsl">
+      <Filter>Shaders\FSL\Terrain</Filter>
+    </FSLShader>
+  </ItemGroup>
+</Project>

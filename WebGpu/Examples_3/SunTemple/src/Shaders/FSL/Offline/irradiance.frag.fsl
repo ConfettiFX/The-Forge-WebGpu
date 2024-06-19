@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ * 
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0f (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0f
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+#include "ibl_cube_resources.h.fsl"
+
+STRUCT(PsIn)
+{
+    DATA(float4, position, SV_Position);
+    DATA(float3, uvw, POSITION0);
+};
+
+STRUCT(FSOutput)
+{
+	DATA(float4, FragmentOutput, SV_Target);
+};
+
+FSOutput PS_MAIN(PsIn In) 
+{
+	INIT_MAIN;
+
+	float3 N = normalize(In.uvw);
+	float3 up = float3(0.0, 1.0, 0.0);
+	float3 right = normalize(cross(up, N));
+	up = cross(N, right);
+
+	const float TWO_PI = PI * 2.0;
+	const float HALF_PI = PI * 0.5;
+
+	float3 color = float3(0.0, 0.0, 0.0);
+	uint sampleCount = 0u;
+
+	float deltaPhi = Get(settings).x;
+	float deltaTheta = Get(settings).y;
+
+	for (float phi = 0.0; phi < TWO_PI; phi += deltaPhi) {
+		for (float theta = 0.0; theta < HALF_PI; theta += deltaTheta) {
+			float3 tempVec = cos(phi) * right + sin(phi) * up;
+			float3 sampleVector = cos(theta) * N + sin(theta) * tempVec;
+			color += SampleTexCube(Get(skyboxTex), Get(uSampler0), sampleVector).rgb * cos(theta) * sin(theta);
+			sampleCount++;
+		}
+	}
+
+	FSOutput Out;
+	Out.FragmentOutput = float4(PI * color / float(sampleCount), 1.0);
+	RETURN(Out);
+}

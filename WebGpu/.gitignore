@@ -1,0 +1,98 @@
+# Native/Dawn clone repo. Used for building binaries..
+Builds/
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.elf
+
+# Visual Studio
+**/.vs/
+**/.vscode/
+**/x64/
+**.vcxproj.user
+**.user
+**.log
+**.VC.db
+**.ilk
+**.pdb
+**.ipdb
+**.iobj
+**.tlog
+**/PS4 Visual Studio 2019/ORBIS/
+
+#  Visual Studio User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Binary Shaders
+**/D3D12/Binary/
+**/Vulkan/Binary/
+**/D3D12/Compiled/
+**/Shaders/Compiled/
+
+# ReloadServer
+**/reload-server.txt
+
+# Automatically Generated Files
+**/Renderer/IRendererDLL.h
+**/Renderer/Renderer.cpp
+
+# Obj folders
+/**/obj/
+/**/bin/
+
+# Generated animation files
+*.ozz
+/**/ThirdParty/OpenSource/ozz-animation/**/*.mk
+
+#assimp ignores
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/*.mk
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/build/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/Build/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/test/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/tools/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/Temp/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/Bin/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/assimp.txt/
+/**/ThirdParty/OpenSource/assimp/4.1.0/**/Assimp.txt/
+
+#Memleak files
+*.memleaks
+
+#Python
+*.pyc
+
+# Android Build Files..
+Android-arm64-v8a/ 

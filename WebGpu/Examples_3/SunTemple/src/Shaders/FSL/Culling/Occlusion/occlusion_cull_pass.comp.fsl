@@ -1,0 +1,194 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ * 
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+struct IndirectDrawIndexArguments
+{
+    uint mIndexCount;
+    uint mInstanceCount;
+    uint mStartIndex;
+    uint mVertexOffset;
+    uint mStartInstance;
+};
+
+struct Bound
+{
+	DATA(float3, min, None); 
+	DATA(float3, max, None); 
+};
+
+CBUFFER(uniformBlock, UPDATE_FREQ_PER_FRAME, b0, binding = 0)
+{
+    DATA(float4x4, p, None);
+    DATA(float4x4, vp, None);
+    DATA(float4, cameraFrustumPlanes[6], None);
+	DATA(uint4, settings, None); // x: # meshes, y: frusCulling, z: occlusionCulling
+};
+
+RES(SamplerState,  uSampler0, UPDATE_FREQ_NONE, s0, binding = 1);
+RES(RWBuffer(float), bounds, UPDATE_FREQ_NONE, u0, binding = 2);
+RES(RWBuffer(IndirectDrawIndexArguments), instanceBuffer, UPDATE_FREQ_NONE, u1, binding = 3);
+RES(RWBuffer(IndirectDrawIndexArguments), indirectInstanceBuffer, UPDATE_FREQ_PER_FRAME, u2, binding = 4);
+RES(Tex2D(float), depthTexture0, UPDATE_FREQ_PER_FRAME, t0, binding = 5);
+RES(Tex2D(float), depthTexture1, UPDATE_FREQ_PER_FRAME, t1, binding = 6);
+RES(Tex2D(float), depthTexture2, UPDATE_FREQ_PER_FRAME, t2, binding = 7);
+RES(Tex2D(float), depthTexture3, UPDATE_FREQ_PER_FRAME, t3, binding = 8);
+RES(Tex2D(float), depthTexture4, UPDATE_FREQ_PER_FRAME, t4, binding = 9);
+RES(Tex2D(float), depthTexture5, UPDATE_FREQ_PER_FRAME, t5, binding = 10);
+RES(Tex2D(float), depthTexture6, UPDATE_FREQ_PER_FRAME, t6, binding = 11);
+
+float SampleDepthTexture(uint mip, float2 uv)
+{
+	if(mip == 0)
+	{
+		return SampleLvlTex2D(Get(depthTexture0), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 1)
+	{
+		return SampleLvlTex2D(Get(depthTexture1), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 2)
+	{
+		return SampleLvlTex2D(Get(depthTexture2), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 3)
+	{
+		return SampleLvlTex2D(Get(depthTexture3), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 4)
+	{
+		return SampleLvlTex2D(Get(depthTexture4), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 5)
+	{
+		return SampleLvlTex2D(Get(depthTexture5), Get(uSampler0), uv, 0).r;
+	}
+	else if(mip == 6)
+	{
+		return SampleLvlTex2D(Get(depthTexture6), Get(uSampler0), uv, 0).r;
+	}
+
+	return 0.0f;
+}
+
+uint oCull_0(float3 bboxMin, float3 bboxMax)
+{
+	float3 boxCorners[8] = {bboxMin,
+							float3(bboxMin.x, bboxMin.y, bboxMax.z),
+							float3(bboxMax.x, bboxMin.y, bboxMax.z),
+							float3(bboxMax.x, bboxMin.y, bboxMin.z),
+							float3(bboxMin.x, bboxMax.y, bboxMin.z),
+							float3(bboxMin.x, bboxMax.y, bboxMax.z),
+							bboxMax,
+							float3(bboxMax.x, bboxMax.y, bboxMin.z) };
+	float minZ = 1;
+	float2 minXY = float2(1.0f, 1.0f);
+	float2 maxXY = float2(0.0f, 0.0f);
+
+	UNROLL
+	for (int i = 0; i < 8; i++)
+	{
+		//transform world space aaBox to NDC
+		float4 clipPos = mul(Get(vp), float4(boxCorners[i], 1));
+
+		clipPos.z = max(clipPos.z, 0);
+
+		clipPos.xyz = clipPos.xyz / clipPos.w;
+
+		clipPos.xy = clamp(clipPos.xy, -1, 1);
+		clipPos.xy = clipPos.xy * float2(0.5, -0.5) + float2(0.5, 0.5);
+
+		minXY = min(clipPos.xy, minXY);
+		maxXY = max(clipPos.xy, maxXY);
+
+		minZ = saturate(min(minZ, clipPos.z));		
+	}
+
+	float4 boxUVs = float4(minXY, maxXY);
+
+	// Calculate hi-Z buffer mip
+	float2 dim = float2(GetDimensions(Get(depthTexture0), Get(uSampler0)));
+	int2 size = int2((maxXY - minXY) * dim.xy);
+	float mip = ceil(log2(max(size.x, size.y)));
+
+	mip = clamp(mip, 0, 6);
+
+	// Texel footprint for the lower (finer-grained) level
+	float  level_lower = max(mip - 1, 0);
+	float nllexp2 = exp2(-level_lower);
+	float2 scale = float2(nllexp2, nllexp2);
+	float2 a = floor(boxUVs.xy*scale);
+	float2 b = ceil(boxUVs.zw*scale);
+	float2 dims = b - a;
+
+	// Use the lower level if we only touch <= 2 texels in both dimensions
+	if (dims.x <= 2 && dims.y <= 2)
+	mip = level_lower;
+
+	int mipLevel = int(mip);
+	//load depths from high z buffer
+	float4 depth = float4(SampleDepthTexture(mipLevel, boxUVs.xy).r,
+					SampleDepthTexture(mipLevel, boxUVs.zy).r,
+					SampleDepthTexture(mipLevel, boxUVs.xw).r,
+					SampleDepthTexture(mipLevel, boxUVs.zw).r
+				);
+
+	//find the max depth
+	float maxDepth = max(max(max(depth.x, depth.y), depth.z), depth.w);
+	if ((maxDepth - minZ) <= -0.0025f)
+	{
+		return 0;
+	}
+	return 1;
+}
+
+NUM_THREADS(64, 1, 1)
+void CS_MAIN( SV_DispatchThreadID(uint3) threadID, SV_GroupID(uint3) groupId )
+{
+	INIT_MAIN;
+
+	if(Get(settings).z == 0)
+	{
+		RETURN();
+	}
+	
+	if (threadID.x < Get(settings).x)
+	{
+		if(Get(indirectInstanceBuffer)[threadID.x].mInstanceCount > 0)
+		{
+			uint bIndex = threadID.x * 6; // 6 floats, 3 per vec...
+			float3 bboxMin = float3(Get(bounds)[bIndex], Get(bounds)[bIndex+1], Get(bounds)[bIndex+2]);
+			float3 bboxMax = float3(Get(bounds)[bIndex+3], Get(bounds)[bIndex+4], Get(bounds)[bIndex+5]);
+		
+			uint bIsMeshVisible = oCull_0(bboxMin, bboxMax);
+				
+			IndirectDrawIndexArguments args = Get(instanceBuffer)[threadID.x];
+			args.mInstanceCount *= bIsMeshVisible;
+			args.mIndexCount *= bIsMeshVisible;
+
+			Get(indirectInstanceBuffer)[threadID.x] = args;
+		}
+	}
+
+	RETURN();
+}

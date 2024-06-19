@@ -1,0 +1,118 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ * 
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+STRUCT(PsIn)
+{
+	DATA(float4, position, SV_Position);
+	DATA(float2, texCoord, TEXCOORD);
+};
+
+STRUCT(FSOutput)
+{
+	DATA(float4, FragmentOutput, SV_Target);
+};
+
+CBUFFER(uniformBlock, UPDATE_FREQ_PER_FRAME, b0, binding = 2)
+{
+    DATA(float4, GammaExposureData, None); // xy: [Gamma, Exposure], zw: Padding/Extra
+};
+
+RES(Tex2D(float4), uTex0, UPDATE_FREQ_NONE, t0, binding = 0);
+RES(SamplerState, uSampler0, UPDATE_FREQ_NONE, s1, binding = 1);
+
+float3 Uncharted2Tonemap(float3 color)
+{
+	const float A = 0.15;
+	const float B = 0.50;
+	const float C = 0.10;
+	const float D = 0.20;
+	const float E = 0.02;
+	const float F = 0.30;
+	const float W = 11.2;
+	return ((color*(A*color+C*B)+D*E)/(color*(A*color+B)+D*F))-E/F;
+}
+
+float3 tonemap(float3 color, float exposure, float gamma)
+{
+	float3 outcol = Uncharted2Tonemap(color.rgb * exposure);
+	outcol = outcol * (1.0f / Uncharted2Tonemap(f3(11.2f)));	
+	return pow(outcol, f3(1.0f / gamma));
+}
+
+// Adapted from https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
+// (MIT License).
+float3 tonemap_aces(float3 color, float white) {
+	const float exposure_bias = 1.8f;
+	const float A = 0.0245786f;
+	const float B = 0.000090537f;
+	const float C = 0.983729f;
+	const float D = 0.432951f;
+	const float E = 0.238081f;
+
+	// Exposure bias baked into transform to save shader instructions. Equivalent to `color *= exposure_bias`
+	const float3x3 rgb_to_rrt = float3x3(
+			float3(0.59719f * exposure_bias, 0.35458f * exposure_bias, 0.04823f * exposure_bias),
+			float3(0.07600f * exposure_bias, 0.90834f * exposure_bias, 0.01566f * exposure_bias),
+			float3(0.02840f * exposure_bias, 0.13383f * exposure_bias, 0.83777f * exposure_bias));
+
+	const float3x3 odt_to_rgb = float3x3(
+			float3(1.60475f, -0.53108f, -0.07367f),
+			float3(-0.10208f, 1.10813f, -0.00605f),
+			float3(-0.00327f, -0.07276f, 1.07602f));
+
+	color = mul(color, rgb_to_rrt);
+	float3 color_tonemapped = (color * (color + A) - B) / (color * (C * color + D) + E);
+	color_tonemapped = mul(color_tonemapped, odt_to_rgb);
+
+	white *= exposure_bias;
+	float white_tonemapped = (white * (white + A) - B) / (white * (C * white + D) + E);
+
+	return color_tonemapped / white_tonemapped;
+}
+
+float3 ToneMapFilmic_Hejl2015(float3 hdr, float whitePt)
+{
+	float4 vh = float4(hdr, whitePt);
+	float4 va = (1.425 * vh) + 0.05f;
+	float4 vf = ((vh * va + 0.004f) / ((vh * (va + 0.55f) + 0.0491f))) - 0.0821f;
+	return vf.rgb / f3(vf.w);
+}
+
+float3 linear_to_srgb(float3 color)
+{
+    color = clamp(color, f3(0.0), f3(1.0));
+    return select( (f3(1.05499994754791259765625) * pow(color, f3(0.4166666567325592041015625)) ) - f3(0.054999999701976776123046875),  color * 12.9200000762939453125, float(AllLessThan(color, 0.003130800090730190277099609375)));
+}
+
+FSOutput PS_MAIN( PsIn In )
+{
+    INIT_MAIN;
+    FSOutput Out;
+    float3 sceneColorHDR = SampleLvlTex2D(Get(uTex0), Get(uSampler0), In.texCoord, 0).rgb;
+	float3 resultColor = ToneMapFilmic_Hejl2015(sceneColorHDR.rgb * Get(GammaExposureData).y, 1.0f);//tonemap(sceneColorHDR, Get(GammaExposureData).y, Get(GammaExposureData).x);
+	resultColor = linear_to_srgb(resultColor);
+
+    Out.FragmentOutput = float4(resultColor, 1.0);
+    RETURN(Out);
+}

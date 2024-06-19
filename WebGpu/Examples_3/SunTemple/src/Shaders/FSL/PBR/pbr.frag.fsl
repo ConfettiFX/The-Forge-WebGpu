@@ -1,0 +1,198 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ *
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+// Shader for simple shading with a point light
+// for planets in Unit Test 12 - Transformations
+
+#include "PBR/resources_defs.h.fsl"
+#include "PBR/shading.h.fsl"
+
+#define SHADOWS_SHADER
+#include "ShadowMapping/shadow_resources_defs.h.fsl"
+#include "ShadowMapping/shadow_resources.h.fsl"
+
+STRUCT(VSOutput)
+{
+	DATA(float4, Position, SV_Position);
+	DATA(float3, WorldPosition, POSITION1);
+	DATA(float3, ViewPosition, POSITION2);
+	DATA(float3, Normal, NORMAL);
+	DATA(float2, TexCoord, TEXCOORD0);
+	DATA(float2, LightTexCoord, TEXCOORD1);
+	DATA(FLAT(uint), MaterialIndex, TEXCOORD2);
+};
+
+float4 PS_MAIN(VSOutput In)
+{
+	INIT_MAIN;
+
+	// Sample textures 
+	float4 albedo = SampleTex2D(Get(diffuseMap), Get(uSamplerSunTempleAlbedo), In.TexCoord);
+	clip(albedo.a < 0.5f ? -1 : 1);
+
+	float4 specularMapColor = SampleTex2D(Get(specularMap), Get(uSamplerSunTempleAlbedo), In.TexCoord);
+	float3 bumpNormal = SampleTex2D(Get(normalMap), Get(uSamplerSunTempleAlbedo), In.TexCoord).rgb;
+	float3 emission = SampleTex2D(Get(emissiveMap), Get(uSamplerSunTempleAlbedo), In.TexCoord).rgb;
+
+	Material material = Get(pbrMaterial)[In.MaterialIndex];
+
+	float3 bakedLighting = calcLightMap(In.LightTexCoord, material.lightUvScale, float(material.matSettings.x));
+
+	// Get cascade index for the current fragment's view position
+	float shadowFactor = 1.0f;
+#if kShadowMapCascadeCount > 0
+	uint cascadeIndex = 0;
+	//for(int sci = 0; sci < kShadowMapCascadeCount - 1; ++sci) 
+	//{
+	//	if(abs(In.ViewPosition.z) < Get(mSplitDepth)[0][sci])
+	//	{
+	//		cascadeIndex = sci + 1;
+	//	}
+	//}
+
+	// Depth compare for shadowing
+	float4 posLS = mul(Get(mViewProjMatrix)[cascadeIndex], float4(In.WorldPosition.xyz, 1.0));
+	posLS /= posLS.w;
+	posLS.y *= -1;
+	posLS.xy = posLS.xy * 0.5f + f2(0.5f);
+	shadowFactor = calcVSMShadowFactor(posLS, cascadeIndex);
+#endif
+
+	// Reconstruct normal
+	float3 reconstructedNormalMap = normalize(ReconstructNormal(bumpNormal));
+
+	// Vertex to eye
+	float3 ViewVec = normalize(Get(camPos).xyz - In.WorldPosition.xyz);
+
+	// Calculate Normal
+	float3 N = normalize(In.Normal.xyz);
+	float3 normal = perturb_normal( reconstructedNormalMap, N, ViewVec, In.TexCoord, 1.0f);
+
+	PBRInfo pbr;
+
+	bool isTransparent = (material.matSettings.y & 0x2) > 0;
+	pbr.isTwoSided = isTransparent;
+	if (isTransparent && dot(normal, ViewVec) < 0.0f)
+	{
+		//flip normal
+		normal = -normal;
+	}
+
+	// sun contrib
+	DirectionalLightData sunData = Get(DirLightData);
+	float3 lightDir = normalize(float3(-sunData.Position.x, sunData.Position.y, sunData.Position.z) - In.WorldPosition.xyz);
+
+	// common lighting vectors
+	pbr.NoV = saturate(dot(normal, ViewVec));
+	pbr.reflectVec = normalize(reflect(-ViewVec, normal));
+	pbr.normal = normal;
+	pbr.viewVec = ViewVec;
+
+	// metallic roughness
+	pbr.metalness = saturate(specularMapColor.b * material.metallicRoughnessFactor.x);
+	pbr.roughness = clamp(specularMapColor.g * material.metallicRoughnessFactor.y, 0.04f, 0.99f);
+	pbr.aRoughness = pbr.roughness * pbr.roughness;
+	
+	// Sample offline rendering environment lighting textures. 
+	float3 environment = SampleLvlTexCube(Get(environmentMap), Get(uSamplerSunTempleAlbedo), pbr.reflectVec, pbr.roughness * 6).rgb;
+	float3 irradiance = SampleTexCube(Get(irradianceMap), Get(uSamplerSunTempleAlbedo), normal).rgb; // Radiance
+	float2 brdf = SampleLvlTex2D(Get(brdfLut), Get(brdfIntegrationSampler), float2(pbr.NoV, pbr.roughness), 0).rg;
+
+	// calculate color contribution from specular lighting
+	pbr.specularColor = lerp(f3(0.04f),  albedo.rgb, pbr.metalness);
+	pbr.diffuseColor = lerp(albedo.rgb, f3(0.0), pbr.metalness);
+
+	// calculate sun light contribution..
+	float3 sunLightContrib = f3(0.0f);
+	float sunLightIntensity = sunData.Color.w;
+
+	sunLightContrib = calculateIllumination(
+			pbr,
+			lightDir,
+			sunData.Color.rgb,
+			shadowFactor) * sunLightIntensity;
+	
+	// point lights
+	float3 pointLightContrib = float3(0, 0, 0);
+	
+	// Find the light cluster for the current pixel
+#if defined(ENABLE_LIGHT_CULLING)
+	float4 position = mul(Get(mvp), float4(In.WorldPosition, 1.0f));
+	position.xy /= position.w;
+	uint2 clusterCoords = uint2(floor( ( position.xy * f2(0.5f) + f2(0.5f) ) * float2(LIGHT_CLUSTER_WIDTH, LIGHT_CLUSTER_HEIGHT)));
+	uint numLightsInCluster = Get(lightClustersCount)[LIGHT_CLUSTER_COUNT_POS(clusterCoords.x, clusterCoords.y)];
+#else
+	uint numLightsInCluster = uint(Get(PointLightsCount).x);
+#endif
+
+	// Accumulate light contributions
+	for (uint j = 0; j < numLightsInCluster; ++j)
+	{
+#if defined(ENABLE_LIGHT_CULLING)
+		uint lightId = Get(lightClusters)[LIGHT_CLUSTER_DATA_POS(j, clusterCoords.x, clusterCoords.y)];
+
+		PointLightData data = Get(PointLightsData)[lightId];
+#else
+		PointLightData data = Get(PointLightsData)[j];
+#endif
+
+		float range = data.Position.w * POINT_LIGHT_RADIUS_MULTIPLIER;
+		float3 toLight = normalize(data.Position.xyz - In.WorldPosition.xyz);
+
+		// Don't apply if 
+		//		- World distance between light and fragment is more than the area of influence of the light
+		//		- Light is behind the surface
+		if (length(In.WorldPosition.xyz - data.Position.xyz) > range || saturate(dot(normal, toLight)) <= 0.0)
+			continue;
+
+		float pointLightIntensity = data.Color.w * 0.125f;
+	
+		pointLightContrib += pointLightShadeRadius(
+		pbr,
+		data.Position.xyz,
+		toLight, 
+		data.Color.rgb,
+		range,
+		In.WorldPosition) * pointLightIntensity;
+	}
+
+	// diffuse & environment lighting
+	float3 kS = FresnelSchlickRoughness(pbr.NoV, pbr.specularColor, pbr.roughness);
+	//float3 kD = (f3(1.0f) - kS) * (1.0f - pbr.metalness);
+
+	// offline diffuse & specular illumination
+	float3 oSpecular = environment * (kS * (brdf.x + brdf.y));
+
+	float NdotL = saturate(dot(pbr.normal, lightDir.xyz));
+	// https://web.archive.org/web/20210228210901/http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
+	float diffuse_brdf_NL = max(0.0, (NdotL + pbr.roughness) / ((1.0 + pbr.roughness) * (1.0 + pbr.roughness))) * (1.0 / PI);
+	float3 oDiffuse = albedo.rgb * diffuse_brdf_NL * irradiance;
+
+	// calculate ambient Lighting..
+	float envLightIntensity = 1.0f;
+	float3 ambient = ( (oSpecular + oDiffuse) * envLightIntensity ) + (bakedLighting.rgb * albedo.rgb);
+
+	float3 shadedColor = sunLightContrib + pointLightContrib + ambient + (emission * material.emissiveFactor.rgb * 5.0f);
+	RETURN(float4(shadedColor.rgb, albedo.a));
+}

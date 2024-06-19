@@ -1,0 +1,51 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ *
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+#define SHADOWS_ENABLED
+
+#define kMaxShadowMapCascadeCount 5
+
+// Changing this you will also have to change the 
+// CalcShadowFunc() in ShadowMapping/shadow_resources.h.fsl
+// Uncomment or add a new line, while changing x to match kShadowMapCascadeCount: SHADOW_FLOAT2_CASCADE_CHECK_4(,x,,)
+// You will also need to edit pbr.frag to account for the cascades (Uncomment the for loop..)..
+
+// You will have to bake shadowmaps for every cascade otherwise it will not work..
+#define kShadowMapCascadeCount 1
+
+#if defined(SHADOWS_ENABLED) && defined(SHADOWS_SHADER)
+	#define RESOURCE_SHADOW_CASCADE_TEXTURE(index, reg, b) \
+		RES(Tex2D(float2), ShadowTextureCascade##index, UPDATE_FREQ_NONE, t##reg, b); 
+
+	CBUFFER(shadowCascadeBlock, UPDATE_FREQ_PER_FRAME, b1, binding = 1)
+	{
+		DATA(float4x4, mViewProjMatrix[kShadowMapCascadeCount], None);
+		DATA(float4, mSplitDepth[3], None);
+		DATA(float4, mSettings, None); // x: Width, y: Height, zw: Bleed Reduction..
+	};
+
+	RESOURCE_SHADOW_CASCADE_TEXTURE(0, 7, binding = 17)
+	// RESOURCE_SHADOW_CASCADE_TEXTURE(1, 8, binding = 18)
+	// RESOURCE_SHADOW_CASCADE_TEXTURE(2, 9, binding = 19)
+#endif

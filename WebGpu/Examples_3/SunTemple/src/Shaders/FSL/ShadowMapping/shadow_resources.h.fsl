@@ -1,0 +1,143 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ *
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+#if defined(SHADOWS_ENABLED)
+	#define SHADOW_FLOAT_CASCADE_CHECK(d, index, check,  sc)                                                                                   \
+		if (index == check)                                                                                                      \
+		{                                                                                                                        \
+			d = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(clampMiplessLinearSampler), sc, 0).r; \
+		}
+	#define SHADOW_FLOAT2_CASCADE_CHECK(d, index, check,  sc)                                                                                   \
+		if (index == check)                                                                                                      \
+		{                                                                                                                        \
+			d = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(clampMiplessLinearSampler), sc, 0).rg; \
+		}
+	#define SHADOW_FLOAT2_CASCADE_CHECK_4(index, check, t00, t01, t10, t11)                                                                                   \
+		if (index == check)                                                                                                      \
+		{                                                                                                                        \
+			z00 = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(uSamplerSunTempleLightmap), t00, 0).rg; \
+			z01 = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(uSamplerSunTempleLightmap), t01, 0).rg; \
+			z10 = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(uSamplerSunTempleLightmap), t10, 0).rg; \
+			z11 = SampleLvlTex2D(Get(ShadowTextureCascade##check), Get(uSamplerSunTempleLightmap), t11, 0).rg; \
+		}
+
+	#define MIN_VARIANCE 0.00005f
+	float calcVSMShadowFactor(float4 shadowCoord, uint cascadeIndex)
+	{
+		float2 texCoord;
+		texCoord.x = (shadowCoord.x * Get(mSettings).x) - 0.5;
+		texCoord.y = (shadowCoord.y * Get(mSettings).y) - 0.5;
+		float x0 = floor(texCoord.x);
+		float x1 = ceil(texCoord.x);
+		float fracx = frac(texCoord.x);
+		float y0 = floor(texCoord.y);
+		float y1 = ceil(texCoord.y);
+		float fracy = frac(texCoord.y);
+    
+		// sample coordinates in [0,1]^2 domain
+		float2 t00, t01, t10, t11;
+		const float invWidth  = 1.0 / Get(mSettings).x;
+		const float invHeight = 1.0 / Get(mSettings).y;
+		t00 = float2((x0+0.5) * invWidth, (y0+0.5) * invHeight);
+		t10 = float2((x1+0.5) * invWidth, (y0+0.5) * invHeight);
+		t01 = float2((x0+0.5) * invWidth, (y1+0.5) * invHeight);
+		t11 = float2((x1+0.5) * invWidth, (y1+0.5) * invHeight);
+    
+		// grab the samples
+		float2 z00 = f2(0.0f), z01 = f2(0.0f), z10 = f2(0.0f), z11 = f2(0.0f); 
+		SHADOW_FLOAT2_CASCADE_CHECK_4(cascadeIndex, 0, t00, t01, t10, t11)
+		//SHADOW_FLOAT2_CASCADE_CHECK_4(cascadeIndex, 1, t00, t01, t10, t11)
+		//SHADOW_FLOAT2_CASCADE_CHECK_4(cascadeIndex, 2, t00, t01, t10, t11)
+	
+		// bilinear filter the sample data
+		float2 d0 = ((1.0 - fracx) * z00) + (fracx * z10);
+		float2 d1 = ((1.0 - fracx) * z01) + (fracx * z11);
+		float2 depth = ((1.0 - fracy) * d0) + (fracy * d1);
+	
+		float zVariance = max(depth.y - depth.x*depth.x, MIN_VARIANCE);
+		float zDev = shadowCoord.z - depth.x;
+	
+		float lit = float(shadowCoord.z <= depth.x);
+	
+		float shadingFactor =  zVariance / (zVariance + (zDev*zDev));
+		shadingFactor = smoothstep(Get(mSettings).z, Get(mSettings).w, shadingFactor);
+		return max(lit, shadingFactor);
+	}
+
+	float calcShadow(float4 shadowCoord, float2 offset, uint cascadeIndex)
+	{
+		float shadow = 1.0;
+		float bias = 0.005;
+
+		if (shadowCoord.z > -1.0 && shadowCoord.z < 1.0) {
+			float depth = 0.0f;
+
+			SHADOW_FLOAT_CASCADE_CHECK(depth, cascadeIndex, 0, shadowCoord.xy)
+			//SHADOW_FLOAT_CASCADE_CHECK(depth, cascadeIndex, 1, shadowCoord.xy)
+			//SHADOW_FLOAT_CASCADE_CHECK(depth, cascadeIndex, 2, shadowCoord.xy)
+
+			if (shadowCoord.w > 0 && depth < shadowCoord.z - bias) {
+				shadow = 0.1f;
+			}
+		}
+		return shadow;
+	}
+
+	float shadowFilterPCF(float4 sc, uint cascadeIndex)
+	{
+		float scale = 0.3;
+		float dx = scale * (1.0f / Get(mSettings).x);
+		float dy = scale * (1.0f / Get(mSettings).y);
+
+		float shadowFactor = 0.0;
+		int count = 0;
+		int range = 1;
+
+		for (int x = -range; x <= range; x++) {
+			for (int y = -range; y <= range; y++) {
+				shadowFactor += calcShadow(sc, float2(dx*x, dy*y), cascadeIndex);
+				count++;
+			}
+		}
+		return shadowFactor / count;
+	}
+
+	// Debug 
+	float3 ColorizeColorWithCascade(float3 color, uint cascadeIndex)
+	{
+		switch(cascadeIndex) {
+			case 0 :
+				color.rgb *= float3(1.0f, 0.25f, 0.25f);
+				break;
+			case 1 :
+				color.rgb *= float3(0.25f, 1.0f, 0.25f);
+				break;
+			case 2 :
+				color.rgb *= float3(0.25f, 0.25f, 1.0f);
+				break;
+		}
+
+		return color;
+	}
+#endif

@@ -1,0 +1,88 @@
+/*
+* Copyright (c) 2017-2024 The Forge Interactive Inc.
+*
+* This file is part of The-Forge
+* (see https://github.com/ConfettiFX/The-Forge).
+*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+* KIND, either express or implied.  See the License for the
+* specific language governing permissions and limitations
+* under the License.
+*/
+
+#define MAX_POINT_LIGHTS 12
+
+#define POINT_LIGHT_RADIUS_MULTIPLIER 2.75f
+
+#define LIGHT_CLUSTER_WIDTH 32
+#define LIGHT_CLUSTER_HEIGHT 16
+
+#define NUM_CULLING_VIEWPORTS 1
+
+#if defined(IN_SHADER)
+
+#define LIGHT_CLUSTER_COUNT_POS(ix, iy) ( ((iy)*LIGHT_CLUSTER_WIDTH)+(ix) )
+#define LIGHT_CLUSTER_DATA_POS(il, ix, iy) ( LIGHT_CLUSTER_COUNT_POS(ix, iy)*MAX_POINT_LIGHTS + (il) )
+
+#define VIEW_CAMERA 0
+STRUCT(CullingViewPort)
+{
+	DATA(float2, windowSize,  None);
+	DATA(uint,   sampleCount, None);
+	DATA(uint,   _pad0,       None);
+};
+
+struct PointLightData
+{
+    // rgb:Color, a:Intensity
+    float4 Color;
+
+    // xyz:Position, w:Radius
+    float4 Position;
+};
+
+struct DirectionalLightData
+{
+    // rgb:Color, a:Intensity
+    float4 Color;
+
+    // xyz:Position, w:Padding/Extra
+    float4 Position;
+};
+
+// cluster lights
+CBUFFER(uniformBlock, UPDATE_FREQ_PER_FRAME, b0, binding = 0)
+{
+    DATA(float4x4, mvp, None);
+    DATA(float4x4, view, None);
+    DATA(float4x4, projection, None);
+    DATA(float4, camPos, None);
+
+    // Directional Light Information
+	DATA(DirectionalLightData, DirLightData, None);
+
+    // Point Light Information
+	DATA(PointLightData, PointLightsData[MAX_POINT_LIGHTS], None);
+	DATA(float4, PointLightsCount, None); // x: Count of Point Lights.. yz:[Gamme, Exposure] w:Padding/Extra..
+
+	DATA(CullingViewPort, cullingViewports[NUM_CULLING_VIEWPORTS], None);
+};
+
+#if defined(LIGHT_CULL_SHADER) && defined(ENABLE_LIGHT_CULLING)
+RES(RWBuffer(uint), lightClustersCount, UPDATE_FREQ_PER_FRAME, u0, binding = 1);
+RES(RWBuffer(uint), lightClusters, UPDATE_FREQ_PER_FRAME, u1, binding=2);
+#endif
+
+#endif

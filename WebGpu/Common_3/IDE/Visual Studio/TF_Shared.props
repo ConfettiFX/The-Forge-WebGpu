@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TheForgeRoot>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)..\..\..\..\"))</TheForgeRoot>
+    <CustomMiddlewareRoot>$([System.IO.Path]::GetFullPath("$(TheForgeRoot)..\Custom-Middleware\"))</CustomMiddlewareRoot>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ConformanceMode>true</ConformanceMode>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <ExceptionHandling>false</ExceptionHandling>
+      <PreprocessorDefinitions>_HAS_EXCEPTIONS=0;$(AdditionalForgeDefines);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ForcedIncludeFiles>%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4819;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+  <ImportGroup Label="PropertySheets">
+    <Import Condition="$(ProjectDir.Contains('Android_VisualStudio2019'))" Project="$(TheForgeRoot)WebGpu\Examples_3\SunTemple\Android_VisualStudio2019\Android-arm64-v8a.props" />
+    <Import Condition="$(ProjectDir.Contains('PC Visual Studio 2019'))" Project="$(TheForgeRoot)WebGpu\Examples_3\SunTemple\PC Visual Studio 2019\Examples.x64.props" />
+    <Import Condition="$(SolutionDir.Contains('UIRemoteControl'))" Project="$(TheForgeRoot)Common_3\Tools\UIRemoteControl\PC Visual Studio 2019\UIRemoteControl.props" />
+  </ImportGroup>
+</Project>

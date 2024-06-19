@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Android-arm64-v8a">
+      <Configuration>Debug</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Android-arm64-v8a">
+      <Configuration>Release</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\SunTemple.cpp" />
+    <ClCompile Include="..\src\SunTempleGeometry.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Libraries\OS\OS.vcxproj">
+      <Project>{3062376a-ea3d-4573-9a3f-cefdbe63c3aa}</Project>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Renderer\Renderer.vcxproj">
+      <Project>{db6193e0-3c12-450f-b344-dc4daed8c421}</Project>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Tools\gainputstatic\gainputstatic.vcxproj">
+      <Project>{a4c073ab-608b-4e1c-b24a-9e3919235f0c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Tools\SpirvTools\SpirvTools.vcxproj">
+      <Project>{5e22ffea-7871-4e40-96b0-269809340c5f}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <FSLShader Include="..\src\Shaders\FSL\blur_resources.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Frustum\frustum_cull_pass.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\clear_light_clusters.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\cluster_lights.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Light\light_cull_resources.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_cull_pass.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_depth_pass.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_depth_pass.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_frag_pass.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_pass.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Culling\Occlusion\occlusion_mip_pass.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Debug\aabb.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Debug\aabb.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Debug\line.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Debug\line.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\fullscreen.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\gammaCorrection.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\gaussianBlur.comp.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Offline\brdf.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Offline\iblCube.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Offline\ibl_cube_resources.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Offline\irradiance.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Offline\prefilteredEnv.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\PBR\pbr.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\PBR\pbr.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\PBR\resources_defs.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\PBR\shading.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShaderList.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPass.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPass.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPassAlpha.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\meshDepthPassAlpha.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\shadow_resources.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\ShadowMapping\shadow_resources_defs.h.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\skybox.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\skybox.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain.frag.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain.vert.fsl" />
+    <FSLShader Include="..\src\Shaders\FSL\Terrain\terrain_resources_defs.h.fsl" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{610C39FA-F02B-4237-BA8C-4EED56FA8D9F}</ProjectGuid>
+    <RootNamespace>SunTemple</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">
+    <AndroidMinSdkVersion>29</AndroidMinSdkVersion>
+    <AndroidNdkVersion>21.4.7075529</AndroidNdkVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
+    <AndroidMinSdkVersion>29</AndroidMinSdkVersion>
+    <AndroidNdkVersion>21.4.7075529</AndroidNdkVersion>
+  </PropertyGroup>
+  <Import Project="AGDEVersions.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="..\..\..\Common_3\IDE\Visual Studio\TF_Shared.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\$(PlatformTarget)\Intermediate\</IntDir>
+    <IncludePath>$(SolutionDir)\..\..\..\Common_3;$(SolutionDir)\..\..\..\..\Common_3;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <AndroidExtraGradleArgs>"-PANDROID_APPLICATION_NAME=$(RootNamespace)"; "-PANDROID_APPLICATION_LIBRARY_NAME=ForgeGame"</AndroidExtraGradleArgs>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
+    <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\$(PlatformTarget)\Intermediate\</IntDir>
+    <IncludePath>$(SolutionDir)\..\..\..\Common_3;$(SolutionDir)\..\..\..\..\Common_3;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>Disabled</Optimization>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <StandardLib>
+      </StandardLib>
+    </ClCompile>
+    <Link>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+    </Link>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PostBuildEvent>
+      <Command>
+      %(Command) 
+      set ASSETS=$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\$(PlatformTarget)\assets\
+
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Meshes\*" "%ASSETS%Meshes\"
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Textures\ktx\*.tex" "%ASSETS%Textures\"
+      xcopy /Y /S /D "$(TheForgeRoot)Art\SanMiguel_3\Textures\ktx\daytime_cube.tex" "%ASSETS%Textures\"
+
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\cameraPath.bin" "%ASSETS%"
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\Fonts\*" "%ASSETS%Fonts\"
+
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Textures\ktx\circlepad.tex" "%ASSETS%Textures\"
+
+      if not exist "$(OutDir)PipelineCaches\VULKAN\" mkdir "%ASSETS%PipelineCaches\VULKAN\"
+      xcopy /E /Y /S /D "$(SolutionDir)$(Platform)\$(Configuration)\OS\Shaders\" "%ASSETS%Shaders\"
+      xcopy /E /Y /S /D "$(SolutionDir)$(Platform)\$(Configuration)\OS\CompiledShaders\" "%ASSETS%CompiledShaders\"
+
+      xcopy /Y /S /D "$(ProjectDir)..\src\GPUCfg\*" "%ASSETS%GPUCfg\"
+      xcopy /Y /S /D "$(TheForgeRoot)Common_3\OS\Android\android_gpu.data" "%ASSETS%GPUCfg\gpu.data*"
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <StandardLib>
+      </StandardLib>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+    </Link>
+    <FxCompile>
+      <EntryPointName>
+      </EntryPointName>
+    </FxCompile>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PostBuildEvent>
+      <Command>
+      %(Command) 
+      set ASSETS=$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\$(PlatformTarget)\assets\
+      
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Meshes\*" "%ASSETS%Meshes\"
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Textures\ktx\*.tex" "%ASSETS%Textures\"
+      xcopy /Y /S /D "$(TheForgeRoot)Art\SanMiguel_3\Textures\ktx\daytime_cube.tex" "%ASSETS%Textures\"
+      
+      xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\cameraPath.bin" "%ASSETS%"
+        
+        xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\Fonts\*" "%ASSETS%Fonts\"
+        xcopy /Y /S /D "$(TheForgeRoot)WebGpu\Art_WebGpu\SunTemple\Textures\ktx\circlepad.tex" "%ASSETS%Textures\"
+
+      if not exist "$(OutDir)PipelineCaches\VULKAN\" mkdir "%ASSETS%PipelineCaches\VULKAN\"
+      xcopy /E /Y /S /D "$(SolutionDir)$(Platform)\$(Configuration)\OS\Shaders\" "%ASSETS%Shaders\"
+      xcopy /E /Y /S /D "$(SolutionDir)$(Platform)\$(Configuration)\OS\CompiledShaders\" "%ASSETS%CompiledShaders\"
+
+      xcopy /Y /S /D "$(ProjectDir)..\src\GPUCfg\*" "%ASSETS%GPUCfg\"
+      xcopy /Y /S /D "$(TheForgeRoot)Common_3\OS\Android\android_gpu.data" "%ASSETS%GPUCfg\gpu.data*"
+</Command>
+    </PostBuildEvent>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\..\..\Common_3\Tools\ForgeShadingLanguage\VS\fsl.targets" />
+  </ImportGroup>
+</Project>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup>
+  <WebGpuBackend>Dawn</WebGpuBackend>
+  <WebGpuDir Condition="'$(WebGpuBackend)' == 'Dawn'">$(TheForgeRoot)\WebGpu\Common_3\Graphics\ThirdParty\OpenSource\webgpu\dawn\libs\x64</WebGpuDir>
+  <WebGpuDir Condition="'$(WebGpuBackend)' == 'Native'">$(TheForgeRoot)\WebGpu\Common_3\Graphics\ThirdParty\OpenSource\webgpu\native\libs\x64</WebGpuDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <WebGpuDirSuffix>Debug</WebGpuDirSuffix>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug'">
+    <WebGpuDirSuffix>Release</WebGpuDirSuffix>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>WEBGPU;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(WebGpuBackend)' == 'Dawn'">WEBGPU_DAWN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(WebGpuBackend)' == 'Native'">WEBGPU_NATIVE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(ConfigurationType)' == 'Application'">
+	<Link>
+		<AdditionalDependencies>
+		opengl32.lib;ws2_32.lib;bcrypt.lib;ntdll.lib;userenv.lib;
+		gdi32.lib;shell32.lib;ole32.lib;oleaut32.lib;
+		%(AdditionalDependencies)
+		</AdditionalDependencies>
+
+		<AdditionalDependencies Condition="'$(WebGpuBackend)' == 'Native'">
+		$(WebGpuDir)\$(WebGpuDirSuffix)\wgpu_native.lib;
+		%(AdditionalDependencies)
+		</AdditionalDependencies>
+
+		<AdditionalDependencies Condition="'$(WebGpuBackend)' == 'Dawn'">
+		$(WebGpuDir)\$(WebGpuDirSuffix)\webgpu_dawn.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\dawn_native.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\dawn_platform.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_api.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_hlsl_writer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_hlsl_writer_ast_printer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_hlsl_writer_common.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_hlsl_writer_ast_raise.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader_lower.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader_ast_parser.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader_ast_lower.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader_parser.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_validate.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_reader_common.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer_printer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer_ast_printer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_helpers.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_inspector.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer_ast_raise.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_ast_transform.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer_raise.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_ir.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_intrinsic.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_type.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core_ir_transform.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_spirv_writer_common.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_api_options.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_reader.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_reader_lower.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_reader_parser.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_reader_program_to_ir.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_writer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_writer_ir_to_program.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_resolver.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_common.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_writer_raise.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_ir.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core_ir.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_intrinsic.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_writer_syntax_tree_printer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_writer_ast_printer.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_program.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_sem.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_ast.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_api_common.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_wgsl_features.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core_intrinsic.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core_constant.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core_type.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_lang_core.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_reflection.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_symbol.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_id.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_generator.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_strconv.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_result.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_diagnostic.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_text.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_system.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_containers.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_rtti.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_ice.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_debug.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_memory.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_macros.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_math.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\tint_utils_traits.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\SPIRV-Tools-opt.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\SPIRV-Tools.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_cord.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_cordz_info.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_cord_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_cordz_functions.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_cordz_handle.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_crc_cord_state.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_crc32c.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_crc_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_crc_cpu_detect.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_str_format_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_raw_hash_set.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_hash.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_city.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_bad_variant_access.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_low_level_hash.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_hashtablez_sampler.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_exponential_biased.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_synchronization.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_stacktrace.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_graphcycles_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_kernel_timeout_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_symbolize.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_malloc_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_debugging_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_demangle_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_time.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_strings.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_strings_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_string_view.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_throw_delegate.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_base.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_spinlock_wait.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_int128.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_civil_time.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_time_zone.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_bad_optional_access.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_raw_logging_internal.lib;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\absl_log_severity.lib;
+		-ignore:4221;
+		$(WebGpuDir)\$(WebGpuDirSuffix)\dawn_common.lib;
+		%(AdditionalDependencies)
+		</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

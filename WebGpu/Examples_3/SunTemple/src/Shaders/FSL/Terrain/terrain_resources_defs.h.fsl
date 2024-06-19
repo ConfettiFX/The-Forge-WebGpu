@@ -1,0 +1,53 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ * 
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+struct Material
+{
+	DATA(float4, emissiveFactor, None); // rgb: emission, a: padding..
+	DATA(float4, metallicRoughnessFactor, None); // rg: [Metallic, Roughness], ba: Padding..
+	DATA(float4, lightUvScale, None); // lightmap uv scale
+	DATA(uint4,  matSettings, None); // x: lightmap gi offset, y: flags, zw: Padding..
+};
+
+#define IN_SHADER
+#include "Culling/Light/light_cull_resources.h.fsl"
+
+// 0-5 UniformBuffers
+// 5-10 Samplers
+// 10 - 20 Textures
+// 20 - ... Etc..
+RES(SamplerState, uSamplerSunTempleAlbedo, UPDATE_FREQ_NONE, s0, binding = 5);
+RES(SamplerState, uSamplerSunTempleTerrainNormal, UPDATE_FREQ_NONE, s1, binding = 6);
+RES(SamplerState, clampMiplessLinearSampler, UPDATE_FREQ_NONE, s2, binding = 7);
+RES(SamplerState, brdfIntegrationSampler, UPDATE_FREQ_NONE, s3, binding = 8);
+RES(SamplerState, uSamplerSunTempleLightmap, UPDATE_FREQ_NONE, s4, binding = 9);
+
+RES(Tex2D(float4), rocksTexture, UPDATE_FREQ_NONE, t0, binding = 10);
+RES(Tex2D(float4), grassTexture, UPDATE_FREQ_NONE, t1, binding = 11);
+RES(Tex2D(float4), rocksNormalTexture, UPDATE_FREQ_NONE, t2, binding = 12);
+RES(Tex2D(float4), grassNormalTexture, UPDATE_FREQ_NONE, t3, binding = 13);
+
+RES(RWBuffer(Material), pbrMaterial, UPDATE_FREQ_NONE, u4, binding = 20);
+
+RES(Tex2D(float4), lightMap, UPDATE_FREQ_NONE, t20, binding = 23);

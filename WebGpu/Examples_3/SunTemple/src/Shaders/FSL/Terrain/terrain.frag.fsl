@@ -1,0 +1,217 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ *
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+#include "Terrain/terrain_resources_defs.h.fsl"
+#include "PBR/shading.h.fsl"
+
+#define SHADOWS_SHADER
+#include "ShadowMapping/shadow_resources_defs.h.fsl"
+#include "ShadowMapping/shadow_resources.h.fsl"
+
+#define LIGHT_MAP_ATLAS_WIDTH 1024.0f
+#define LIGHT_MAP_ATLAS_HEIGHT 2560.0f
+#define LIGHT_MAP_ATLAS_OBJECT_MAP_SIZE 64.0f
+
+STRUCT(VSOutput)
+{
+	DATA(float4, Position, SV_Position);
+	DATA(float3, WorldPosition, POSITION1);
+	DATA(float3, ViewPosition, POSITION2);
+	DATA(float3, Normal, NORMAL);
+	DATA(float2, TexCoord, TEXCOORD0);
+	DATA(float2, LightTexCoord, TEXCOORD3);
+	DATA(float2, ScreenCoord, TEXCOORD4);
+	DATA(FLAT(uint), MaterialIndex, TEXCOORD5);
+};
+
+float3 blendAngleCorrectedNormals(float3 n1, float3 n2)
+{
+	float n1b = n1.g + 1.0f;
+	float3 r1 = float3(n1.r, n1.g, n1b);
+
+	float2 n2rg =  n2.rb * -1.0f;
+	float3 r2 = float3(n2rg.r, n2.g, n2rg.g);
+
+	float r3 = dot(r1, r2);
+
+	float3 r4 = r1 * r3;
+
+	float3 r5 = (r1.g + 1.0f) * r2;
+
+	return r4 - r5;
+}
+
+float3 SwapNormalZY(float3 normal)
+{
+	float yT = normal.y;
+	normal.y = normal.z;
+	normal.z = yT;
+
+	return normal;
+}
+
+float4 PS_MAIN(VSOutput In)
+{
+	INIT_MAIN;
+	
+	float ScaleGrass = 21.075829f;
+	float DetailScaleRocks = 91.386429f;
+	float ScaleRocks = 13.641997f;
+
+	Material material = Get(pbrMaterial)[In.MaterialIndex];
+	if( (material.matSettings.y & 16u) > 0 )
+	{
+		ScaleGrass = 12.467288f;
+		DetailScaleRocks = 1.0f;
+		ScaleRocks = 2.059065f;
+	}
+
+    float2 TexCoord0 = In.TexCoord * ScaleGrass;
+	float2 TexCoord1 = In.TexCoord * ScaleRocks;
+	float2 TexCoord2 = In.TexCoord * DetailScaleRocks;
+
+	// Sample textures 
+	float4 grassAlbedo = SampleTex2D(Get(grassTexture), Get(uSamplerSunTempleAlbedo), TexCoord0);
+	float4 rockAlbedo = SampleTex2D(Get(rocksTexture), Get(uSamplerSunTempleAlbedo), TexCoord1);
+
+	float3 bGrassNormal0 = SampleTex2D(Get(grassNormalTexture), Get(uSamplerSunTempleTerrainNormal), TexCoord0).rgb;
+	float3 bRocksNormal1 = SampleTex2D(Get(rocksNormalTexture), Get(uSamplerSunTempleTerrainNormal), TexCoord1).rgb;
+	float3 bRocksNormal2 = SampleTex2D(Get(rocksNormalTexture), Get(uSamplerSunTempleTerrainNormal), TexCoord2).rgb;
+
+	float3 bakedLighting = calcLightMap(In.LightTexCoord, material.lightUvScale, float(material.matSettings.x));
+
+	// Get cascade index for the current fragment's view position
+	float shadowFactor = 1.0f;
+#if kShadowMapCascadeCount > 0
+	uint cascadeIndex = 0;
+	
+	// Depth compare for shadowing
+	float4 posLS = mul(Get(mViewProjMatrix)[cascadeIndex], float4(In.WorldPosition.xyz, 1.0));
+	posLS /= posLS.w;
+	posLS.y *= -1;
+	posLS.xy = posLS.xy * 0.5f + f2(0.5f);
+	shadowFactor = calcVSMShadowFactor(posLS, cascadeIndex);
+#endif
+
+	// Vertex to eye
+	float3 ViewVec = normalize(Get(camPos).xyz - In.WorldPosition.xyz);
+
+	// Calculate Normal
+	float3 N = normalize(In.Normal.xyz);
+
+	// Reconstruct normal
+	float3 rGrassNormal0 = ReconstructNormal(bGrassNormal0);
+	float3 rRocksNormal1 = ReconstructNormal(bRocksNormal1);
+	float3 rRocksNormal2 = ReconstructNormal(bRocksNormal2);
+
+	// Vars
+	float BlendMultiplier = 5.92f;
+	float BlendPower = 41.68f;
+
+	float3 GrassColorFactor = float3(0.387931f, 0.300458f, 0.218329f);
+	float NormalIntensityGrass = 0.737011f;
+	float RoughnessGrass = 0.964602f;
+
+	float3 RockColorFactor = float3(0.206897f, 0.162453f, 0.131898f);
+	float DetailNormalIntensityRocks = 0.425741f;
+	float NormalIntensityRocks = 0.317725f;
+	float MetallicRocksLow = 0.380531f;
+	float MetallicRocksHigh = 0.942478f;
+	float RoughnessRocksHigh = 1.181621f;
+	float RoughnessRocksLow  = 0.209738f;
+
+	if( (material.matSettings.y & 16u) != 0 )
+	{
+		BlendMultiplier = 1.906698f;
+		BlendPower = 2.520569f;
+		
+		GrassColorFactor = float3(0.198276f, 0.168725f, 0.106875f);
+		NormalIntensityGrass = 2.801727f;
+		RoughnessGrass = 0.902655f;
+		
+		RockColorFactor = float3(0.215518f, 0.198521f, 0.165020f);
+		DetailNormalIntensityRocks = 0.371682f;
+		NormalIntensityRocks = 0.51772f;
+		MetallicRocksLow = 0.0f;
+		MetallicRocksHigh = 1.0f;
+		RoughnessRocksHigh = 1.0f;
+		RoughnessRocksLow  = 0.0f;
+	}
+
+	// WS vertex normal blend
+	float yBlend = saturate(pow(dot(N, float3(0,1,0)), (BlendPower)) * (BlendMultiplier));
+
+	float3 rockColor = (RockColorFactor) * rockAlbedo.rgb;
+	float3 grassColor = (GrassColorFactor) * grassAlbedo.rgb;
+	float3 albedo = select(rockColor, grassColor, yBlend);
+
+	float metallic = select(select((MetallicRocksHigh), (MetallicRocksLow), rockAlbedo.r), 0.0f, yBlend);
+	float roughness = select(select((RoughnessRocksHigh), (RoughnessRocksLow), rockAlbedo.r), (RoughnessGrass), yBlend);
+
+	float3 yVec = float3(0,0,1);
+	float3 xzVec = float3(1,1,0);
+	float3 gNormal0 = rGrassNormal0 * ( yVec + (xzVec * NormalIntensityGrass) );
+	float3 rNormal1 = rRocksNormal1 * ( yVec + (xzVec * NormalIntensityRocks) );
+	float3 rNormal2 = rRocksNormal2 * ( yVec + (xzVec * DetailNormalIntensityRocks) );
+
+	float3 ybNormal = select(rNormal2, gNormal0, yBlend);
+	float3 cNormal = blendAngleCorrectedNormals(rNormal1, ybNormal);
+
+	float3 normal = normalize(SwapNormalZY(cNormal));//perturb_normal( cNormal, N, -ViewVec, TexCoord0, 1.0f);
+
+	// sun contrib
+	DirectionalLightData sunData = Get(DirLightData);
+	float3 lightDir = normalize(float3(sunData.Position.x, sunData.Position.y, sunData.Position.z) - In.WorldPosition.xyz);
+
+	// common lighting vectors
+	PBRInfo pbr;
+	pbr.NoV = saturate(dot(normal, ViewVec));
+	pbr.reflectVec = normalize(reflect(-ViewVec, normal));
+	pbr.normal = normal;
+	pbr.viewVec = ViewVec;
+
+	// metallic roughness
+	pbr.metalness = metallic;
+	pbr.roughness = roughness;
+	pbr.aRoughness = pbr.roughness * pbr.roughness;
+	
+	// calculate color contribution from specular lighting
+	pbr.specularColor = lerp(f3(0.04f),  albedo.rgb, pbr.metalness);
+	pbr.diffuseColor = lerp(albedo.rgb, f3(0.0), pbr.metalness);
+
+	// calculate sun light contribution..
+	float3 sunLightContrib = f3(0.0f);
+	float sunLightIntensity = sunData.Color.w;
+	sunLightContrib = calculateIllumination(
+			pbr,
+			lightDir,
+			sunData.Color.rgb,
+			shadowFactor) * sunLightIntensity;
+
+	// calculate ambient Lighting..
+	float3 ambient = albedo.rgb * bakedLighting.rgb + (albedo.rgb * 0.15f);
+
+	float3 shadedColor = sunLightContrib + ambient;
+	RETURN(float4(shadedColor.rgb, 1.0f));
+}

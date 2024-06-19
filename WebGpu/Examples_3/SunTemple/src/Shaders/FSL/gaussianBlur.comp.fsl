@@ -1,0 +1,55 @@
+/*
+* Copyright (c) 2017-2024 The Forge Interactive Inc.
+*
+* This file is part of The-Forge
+* (see https://github.com/ConfettiFX/The-Forge).
+*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+* KIND, either express or implied.  See the License for the
+* specific language governing permissions and limitations
+* under the License.
+*/
+
+#define THREADX 16
+#define THREADY 16
+#include "blur_resources.h.fsl"
+
+RES(RWTex2D(float2),  srcTexture, UPDATE_FREQ_NONE, u0, binding = 1);
+RES(RWTex2D(float2),  dstTexture, UPDATE_FREQ_NONE, u1, binding = 2);
+
+float2 Pass(int2 id)
+{
+	float2 result = f2(0);
+	int2 offsetDir = PASS_TYPE == PASS_TYPE_HORIZONTAL ? int2(1, 0) : int2(0, 1);
+
+	float sum = 0.0f;
+	for (int i = - int(FILTER_RADIUS); i <= int(FILTER_RADIUS); i++)
+	{
+		float weight = Get(mBlurWeights[abs(i)/4][abs(i)%4]);
+		result += LoadRWTex2D(Get(srcTexture), id + offsetDir * i).rg * weight;
+		sum += weight;
+	}
+	return result / sum;
+}
+
+NUM_THREADS(THREADX, THREADY, 1)
+void CS_MAIN( SV_DispatchThreadID(uint3) threadID) 
+{
+	INIT_MAIN;
+	float2 result = Pass(int2(threadID.xy));
+
+	Write2D(Get(dstTexture), threadID.xy, result);
+	RETURN();
+}

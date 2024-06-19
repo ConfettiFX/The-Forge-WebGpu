@@ -1,0 +1,239 @@
+/*
+ * Copyright (c) 2017-2024 The Forge Interactive Inc.
+ *
+ * This file is part of The-Forge
+ * (see https://github.com/ConfettiFX/The-Forge).
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+*/
+
+#include "../../../../../../Common_3/Graphics/ShaderUtilities.h.fsl"
+
+#define LIGHT_MAP_ATLAS_WIDTH 1024.0f
+#define LIGHT_MAP_ATLAS_HEIGHT 2560.0f
+#define LIGHT_MAP_ATLAS_OBJECT_MAP_SIZE 64.0f
+
+struct PBRInfo
+{
+	// Common
+	float NoV;
+
+	float roughness; 
+	float aRoughness; 
+	float metalness;
+
+	float3 diffuseColor;
+	float3 specularColor;
+
+	float3 reflectVec;
+	float3 viewVec;
+	float3 normal;
+
+	bool isTwoSided;
+};
+
+#define PI_DIV2 1.57079632679
+
+float3x3 cotangent_frame(float3 normalVertex, float3 p, float2 uv)
+{
+	// get edge vectors of the pixel triangle
+	float3 dPdx = ddx(p);
+	float3 dPdy = ddy(p);
+	float2 dUVdx = ddx(uv);
+	float2 dUVdy = ddy(uv);
+
+	// solve the linear system
+	float3 crossPdyN = cross(dPdy, normalVertex);
+	float3 crossNPdx = cross(normalVertex, dPdx);
+	float3 T = crossPdyN * dUVdx.x + crossNPdx * dUVdy.x;
+	float3 B = crossPdyN * dUVdx.y + crossNPdx * dUVdy.y;
+
+	// construct a scale-invariant frame 
+	float invmax = rsqrt(max(dot(T, T), dot(B, B)));
+	return float3x3(T * invmax, B * invmax, normalVertex);
+}
+
+float3 perturb_normal( float3 map, float3 normalVertex, float3 V, float2 texcoord, float strength) { 
+	// assume normalVertex, the interpolated vertex normal and 
+	// V, the view vector (vertex to eye) 
+	float3x3 TBN = cotangent_frame( normalVertex, -V, texcoord ); 
+	
+	map.xy *= strength;
+	map.z = lerp(1.0, map.z, saturate(strength));
+
+	return normalize( mul(TBN, map) ); 
+}
+
+float3 ReconstructNormal(float3 bumpNormal)
+{
+	float3 reconstructedNormalMap;
+#if defined(NORMAL_MAP_COMPRESSED)
+	reconstructedNormalMap.xy = bumpNormal.rg * float2(2.0f,2.0f) - float2(1.0f,1.0f);
+	reconstructedNormalMap.z = sqrt(saturate(1.0f - dot(reconstructedNormalMap.xy, reconstructedNormalMap.xy)));
+#else
+	reconstructedNormalMap = bumpNormal * 2.0f - 1.0f;
+#endif
+	return reconstructedNormalMap;
+}
+
+float DistributionGGX(float NoH, float roughness)
+{
+	float a = roughness*roughness;
+	float a2 = a*a;
+	float NdotH = NoH;
+	float NdotH2 = NdotH*NdotH;
+	float nom = a2;
+	float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+	denom = PI * denom * denom;
+
+	return nom / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+	float r = (roughness + 1.0f);
+	float k = (r*r) / 8.0f;
+
+	float nom = NdotV;
+	float denom = NdotV * (1.0 - k) + k;
+
+	return nom / denom;
+}
+
+float GeometrySmith(float NoL, float NoV, float roughness)
+{
+	float ggx2 = GeometrySchlickGGX(NoV, roughness);
+	float ggx1 = GeometrySchlickGGX(NoL, roughness);
+
+	return ggx1 * ggx2;
+}
+
+float3 LambertDiffuse(float3 albedo, float3 kD)
+{
+	return kD * albedo / PI;
+}
+
+float3 FresnelSchlick(float cosTheta, float3 F0)
+{
+	return F0 + (1.0f - F0) * Pow5(saturate(1.0 - cosTheta));
+}
+
+float3 BRDF(PBRInfo pbr, float3 lightDir)
+{	
+	const float3 HalfVec = normalize(pbr.viewVec + lightDir.xyz);
+	float NoH = saturate(dot(pbr.normal, HalfVec));
+	float NoL = saturate(dot(pbr.normal, lightDir.xyz));
+	float HoV = saturate(dot(HalfVec, pbr.viewVec));
+
+	float D = DistributionGGX(NoH, pbr.roughness);
+	float G = GeometrySmith(NoL, pbr.NoV, pbr.roughness);
+	float3 F = FresnelSchlick(HoV, pbr.specularColor);
+
+	float3 kS = F;
+	float3 kD = (f3(1.0f) - kS) * (1.0f - pbr.metalness);
+
+	// Id & Is: diffuse & specular illumination
+	float3 Is = D * G * F / (4.0f * NoH * NoL + 0.001f);
+	float3 Id = LambertDiffuse(pbr.diffuseColor, kD);
+
+	return ( Id + Is ) * NoL;
+}
+
+// Intensity not applied 
+float3 calculateIllumination(
+	PBRInfo pbr,
+	float3 lightDir,
+	float3 lightColor,
+	float shadowFactor)
+{
+	return BRDF(pbr, lightDir) * lightColor * shadowFactor;
+}
+
+// Intensity not applied 
+float3 pointLightShadeRadius(
+	PBRInfo pbr,
+	float3 lightPos,
+	float3 toLight,
+	float3 lightColor,
+	float lightRadius,
+	float3 posWS)
+{
+	// Radius 
+	const float  distance = length(lightPos - posWS);
+
+	float dDivRadius = abs(distance / lightRadius);
+	float dDivRadius2 = dDivRadius * dDivRadius;
+
+	const float  distanceByRadius = 1.0f - (dDivRadius2 * dDivRadius2);
+	const float  clamped = pow(abs(saturate(distanceByRadius)), 2.0f);
+	const float  attenuation = clamped / (distance * distance + 1.0f);
+
+	const float3 radiance = lightColor * attenuation;
+
+	return BRDF(pbr, toLight) * radiance;
+}
+
+float3 calcLightMap(float2 lightTexCoord, float4 lightUvScale, float giOffset)
+{
+	// correct uv y due to atlas only being vertically longer than orginal maps..
+	//( (LIGHT_MAP_ATLAS_HEIGHT / 5) / LIGHT_MAP_ATLAS_HEIGHT ) = ( 512 / LIGHT_MAP_ATLAS_HEIGHT )
+	
+	float lm_vertical_uv_slice = 512.0f / LIGHT_MAP_ATLAS_HEIGHT;
+	float lm_vertical_uv_start = lm_vertical_uv_slice * giOffset;
+
+	float2 light_map_uv = lightTexCoord * lightUvScale.zw + lightUvScale.xy;
+	light_map_uv.y = lerp(lm_vertical_uv_start, lm_vertical_uv_start + lm_vertical_uv_slice, light_map_uv.y); 
+
+	// Bi-linear filter ourselves..
+	// Linear filtering on hardware not available..
+	float width = 1024.0f;
+	float height = 2560.0f;
+
+	float2 texCoord;
+	texCoord.x = (light_map_uv.x * width) - 0.5;
+	texCoord.y = (light_map_uv.y * height) - 0.5;
+
+	float x0 = floor(texCoord.x);
+	float x1 = ceil(texCoord.x);
+	float fracx = frac(texCoord.x);
+	float y0 = floor(texCoord.y);
+	float y1 = ceil(texCoord.y);
+	float fracy = frac(texCoord.y);
+    
+	// sample coordinates in [0,1]^2 domain
+	float2 t00, t01, t10, t11;
+	const float invWidth  = 1.0 / width;
+	const float invHeight = 1.0 / height;
+	t00 = float2((x0+0.5) * invWidth, (y0+0.5) * invHeight);
+	t10 = float2((x1+0.5) * invWidth, (y0+0.5) * invHeight);
+	t01 = float2((x0+0.5) * invWidth, (y1+0.5) * invHeight);
+	t11 = float2((x1+0.5) * invWidth, (y1+0.5) * invHeight);
+    
+	// grab the samples
+	float3 z00 = f3(0.0f), z01 = f3(0.0f), z10 = f3(0.0f), z11 = f3(0.0f); 
+	z00 = SampleTex2D(Get(lightMap), Get(uSamplerSunTempleLightmap), t00).rgb; 
+	z01 = SampleTex2D(Get(lightMap), Get(uSamplerSunTempleLightmap), t01).rgb; 
+	z10 = SampleTex2D(Get(lightMap), Get(uSamplerSunTempleLightmap), t10).rgb; 
+	z11 = SampleTex2D(Get(lightMap), Get(uSamplerSunTempleLightmap), t11).rgb; 
+	
+	// bilinear filter the sample data
+	float3 d0 = ((1.0 - fracx) * z00) + (fracx * z10);
+	float3 d1 = ((1.0 - fracx) * z01) + (fracx * z11);
+
+	return ((1.0 - fracy) * d0) + (fracy * d1);
+} 

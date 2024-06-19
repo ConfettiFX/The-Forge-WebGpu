@@ -1,0 +1,133 @@
+#frag aabb.frag
+#include "Debug/aabb.frag.fsl"
+#end
+
+#vert aabb.vert
+#include "Debug/aabb.vert.fsl"
+#end
+
+#frag line.frag
+#include "Debug/line.frag.fsl"
+#end
+
+#vert line.vert
+#include "Debug/line.vert.fsl"
+#end
+
+#frag pbr_light_cull.frag
+#define NORMAL_MAP_COMPRESSED
+#define ENABLE_LIGHT_CULLING
+#include "PBR/pbr.frag.fsl"
+#end
+
+#frag pbr_no_cull.frag
+#define NORMAL_MAP_COMPRESSED
+#include "PBR/pbr.frag.fsl"
+#end
+
+#vert pbr.vert
+#include "PBR/pbr.vert.fsl"
+#end
+
+#frag terrain.frag
+#define NORMAL_MAP_COMPRESSED
+#include "Terrain/terrain.frag.fsl"
+#end
+
+#vert terrain.vert
+#include "Terrain/terrain.vert.fsl"
+#end
+
+#frag gammaCorrection.frag
+#include "gammaCorrection.frag.fsl"
+#end
+
+#frag brdf.frag
+#include "Offline/brdf.frag.fsl"
+#end
+
+#vert fullscreen.vert
+#include "fullscreen.vert.fsl"
+#end
+
+#frag prefilteredEnv.frag
+#include "Offline/prefilteredEnv.frag.fsl"
+#end
+
+#frag irradiance.frag
+#include "Offline/irradiance.frag.fsl"
+#end
+
+#vert iblCube.vert
+#include "Offline/iblCube.vert.fsl"
+#end
+
+#frag skybox.frag
+#include "skybox.frag.fsl"
+#end
+
+#vert skybox.vert
+#include "skybox.vert.fsl"
+#end
+
+#vert FT_ICB meshDepthPass.vert
+#include "ShadowMapping\meshDepthPass.vert.fsl"
+#end
+
+#vert FT_ICB meshDepthPassAlpha.vert
+#include "ShadowMapping\meshDepthPassAlpha.vert.fsl"
+#end
+
+#frag FT_ICB meshDepthPass.frag
+#include "ShadowMapping\meshDepthPass.frag.fsl"
+#end
+
+#frag FT_ICB meshDepthPassAlpha.frag
+#include "ShadowMapping\meshDepthPassAlpha.frag.fsl"
+#end
+
+#comp clear_light_clusters.comp
+#define ENABLE_LIGHT_CULLING
+#include "Culling/Light/clear_light_clusters.comp.fsl"
+#end
+
+#comp cluster_lights.comp
+#define ENABLE_LIGHT_CULLING
+#include "Culling/Light/cluster_lights.comp.fsl"
+#end
+
+#comp gaussianBlur_Horizontal.comp
+#define PASS_TYPE 0
+#include "gaussianBlur.comp.fsl"
+#end
+
+#comp gaussianBlur_Vertical.comp
+#define PASS_TYPE 1
+#include "gaussianBlur.comp.fsl"
+#end
+
+#comp frustum_cull_pass.comp
+#include "Culling/Frustum/frustum_cull_pass.comp.fsl"
+#end
+
+// Occlusion
+// Disabled...
+//#comp occlusion_mip_pass.comp
+//#include "Culling/occlusion_mip_pass.comp.fsl"
+//#end
+//
+//#frag occlusion_mip_pass.frag
+//#include "Culling/occlusion_mip_pass.frag.fsl"
+//#end
+//
+//#comp occlusion_cull_pass.comp
+//#include "Culling/occlusion_cull_pass.comp.fsl"
+//#end
+//
+//#frag occlusion_depth_pass.frag
+//#include "Culling/occlusion_depth_pass.frag.fsl"
+//#end
+//
+//#vert occlusion_depth_pass.vert
+//#include "Culling/occlusion_depth_pass.vert.fsl"
+//#end
