@@ -356,7 +356,8 @@ void platformSetupWindowSystemUI(IApp* pApp)
     uiSetWidgetDeferred(pWindowed, true);
     REGISTER_LUA_WIDGET(pWindowed);
 
-    RadioButtonWidget rbFullscreen;
+    // Disable for webgpu..
+    /*RadioButtonWidget rbFullscreen;
     rbFullscreen.pData = &pWindowRef->mWindowMode;
     rbFullscreen.mRadioId = WM_FULLSCREEN;
     UIWidget* pFullscreen = uiCreateComponentWidget(pWindowControlsComponent, "Fullscreen", &rbFullscreen, WIDGET_TYPE_RADIO_BUTTON);
@@ -372,17 +373,17 @@ void platformSetupWindowSystemUI(IApp* pApp)
     uiSetWidgetDeferred(pBorderless, true);
     REGISTER_LUA_WIDGET(pBorderless);
 
-    ButtonWidget bMaximize;
-    UIWidget*    pMaximize = uiCreateComponentWidget(pWindowControlsComponent, "Maximize", &bMaximize, WIDGET_TYPE_BUTTON);
-    uiSetWidgetOnEditedCallback(pMaximize, nullptr, wndMaximizeWindow);
-    uiSetWidgetDeferred(pMaximize, true);
-    REGISTER_LUA_WIDGET(pMaximize);
+     ButtonWidget bMaximize;
+     UIWidget*    pMaximize = uiCreateComponentWidget(pWindowControlsComponent, "Maximize", &bMaximize, WIDGET_TYPE_BUTTON);
+     uiSetWidgetOnEditedCallback(pMaximize, nullptr, wndMaximizeWindow);
+     uiSetWidgetDeferred(pMaximize, true);
+     REGISTER_LUA_WIDGET(pMaximize);
 
-    ButtonWidget bMinimize;
-    UIWidget*    pMinimize = uiCreateComponentWidget(pWindowControlsComponent, "Minimize", &bMinimize, WIDGET_TYPE_BUTTON);
-    uiSetWidgetOnEditedCallback(pMinimize, nullptr, wndMinimizeWindow);
-    uiSetWidgetDeferred(pMinimize, true);
-    REGISTER_LUA_WIDGET(pMinimize);
+     ButtonWidget bMinimize;
+     UIWidget*    pMinimize = uiCreateComponentWidget(pWindowControlsComponent, "Minimize", &bMinimize, WIDGET_TYPE_BUTTON);
+     uiSetWidgetOnEditedCallback(pMinimize, nullptr, wndMinimizeWindow);
+     uiSetWidgetDeferred(pMinimize, true);
+     REGISTER_LUA_WIDGET(pMinimize);*/
 
     CheckboxWidget rbCentered;
     rbCentered.pData = &(pWindowRef->centered);
@@ -406,7 +407,8 @@ void platformSetupWindowSystemUI(IApp* pApp)
     setRectSliderY.mMax = recHeight;
     REGISTER_LUA_WIDGET(uiCreateComponentWidget(pWindowControlsComponent, "Window Y Offset", &setRectSliderY, WIDGET_TYPE_SLIDER_INT));
 
-    SliderIntWidget setRectSliderW;
+    // Disable for webgpu..
+    /*SliderIntWidget setRectSliderW;
     setRectSliderW.pData = &pWindowRef->mWndW;
     setRectSliderW.mMin = 144;
     setRectSliderW.mMax = getRectWidth(&pWindowRef->fullscreenRect);
@@ -429,7 +431,7 @@ void platformSetupWindowSystemUI(IApp* pApp)
         uiCreateComponentWidget(pWindowControlsComponent, "Set recommended window rectangle", &bRecWndSize, WIDGET_TYPE_BUTTON);
     uiSetWidgetOnEditedCallback(pRecWndSize, nullptr, wndSetRecommendedWindowSize);
     uiSetWidgetDeferred(pRecWndSize, true);
-    REGISTER_LUA_WIDGET(pRecWndSize);
+    REGISTER_LUA_WIDGET(pRecWndSize);*/
 
 #if WINDOW_DETAILS
     uint      windowDetailsWidgetCount = 0;

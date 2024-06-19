@@ -58,10 +58,23 @@ GroupShared(uint, workGroupOutputSlot[NUM_CULLING_VIEWPORTS]);
 GroupShared(uint, workGroupIndexCount[NUM_CULLING_VIEWPORTS]);
 GroupShared(FilterDispatchGroupData, filterDispatchGroupData);
 
+#ifndef ENABLE_CULL_BACKFACE
 #define ENABLE_CULL_BACKFACE			1
+// Enables counter clockwise triangle culling 
+// #define ENABLE_CULL_BACKFACE_CCW
+#endif
+
+#ifndef ENABLE_CULL_FRUSTUM
 #define ENABLE_CULL_FRUSTUM				1
+#endif
+
+#ifndef ENABLE_CULL_SMALL_PRIMITIVES
 #define ENABLE_CULL_SMALL_PRIMITIVES	1
+#endif
+
+#ifndef ENABLE_GUARD_BAND
 #define ENABLE_GUARD_BAND				0
+#endif
 
 float4 LoadVertex(uint index)
 {
@@ -71,7 +84,7 @@ float4 LoadVertex(uint index)
 STATIC const uint cullFlags = 0xFFFFFFFF;
 
 // Performs all the culling tests given 3 vertices
-bool FilterTriangle(uint indices[3], float4 vertices[3], bool cullBackFace, float2 windowSize, uint samples)
+bool FilterTriangle(uint indices[3], float4 vertices[3], bool cullBackFace, bool twoSided, float2 windowSize, uint samples)
 {
 #if ENABLE_CULL_BACKFACE
 	if (cullBackFace)
@@ -81,10 +94,17 @@ bool FilterTriangle(uint indices[3], float4 vertices[3], bool cullBackFace, floa
 		//       by Marc Olano, Trey Greer
 		//
 		// If the determinant is = 0, the triangle is being viewed edge-on or is degenerate, and has 0 screen-space area.
-		// If the determinant is > 0, the triangle is backfacing.
+
 		float det = determinant(float3x3(vertices[0].xyw, vertices[1].xyw, vertices[2].xyw));
-		if (det >= 0)
+#ifdef ENABLE_CULL_BACKFACE_CCW
+		// If the determinant is < 0, the triangle is backfacing.
+		if (det == 0 || (det < 0 && !twoSided))
 			return true;
+#else
+		// If the determinant is > 0, the triangle is backfacing.
+		if (det == 0 || (det > 0 && !twoSided))
+			return true;
+#endif
 	}
 #endif
 

@@ -385,21 +385,18 @@ static void togglePlatformUI()
     extern void platformToggleWindowSystemUI(bool);
     platformToggleWindowSystemUI(gShowPlatformUI);
 
-    uiSetComponentActive(pToggleVSyncWindow, gShowPlatformUI);
+    uiSetComponentActive(pToggleVSyncWindow, !gShowPlatformUI);
 #if defined(ENABLE_FORGE_RELOAD_SHADER)
     uiSetComponentActive(pReloadShaderComponent, gShowPlatformUI);
 #endif
-
-    // toggleProfilerMenuUI(gShowPlatformUI);
-
-    // if (pAPISwitchingWindow)
-    //    uiSetComponentActive(pAPISwitchingWindow, gShowPlatformUI);
 #endif
 }
 
 void setupPlatformUI(int32_t width, int32_t height)
 {
 #ifdef ENABLE_FORGE_UI
+    gShowPlatformUI = true;
+
     // WINDOW AND RESOLUTION CONTROL
     extern void platformSetupWindowSystemUI(IApp*);
     platformSetupWindowSystemUI(pApp);

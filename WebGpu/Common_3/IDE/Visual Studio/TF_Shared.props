@@ -22,6 +22,17 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
+    <ClCompile>
+      <!-- When updating the sdk, you should only need to change the values in this file, and to copy the DLLs in the game/pc/D3D12 directory -->
+      <!-- General -->
+      <PreprocessorDefinitions>
+        D3D12_AGILITY_SDK=1;
+        D3D12_AGILITY_SDK_VERSION=611;
+        %(PreprocessorDefinitions)
+      </PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup />
   <ImportGroup Label="PropertySheets">
     <Import Condition="$(ProjectDir.Contains('Android_VisualStudio2019'))" Project="$(TheForgeRoot)WebGpu\Examples_3\SunTemple\Android_VisualStudio2019\Android-arm64-v8a.props" />

@@ -84,7 +84,7 @@ static UIComponent* pToggleVSyncComponent = NULL;
 static UIWidget* pSwitchComponentLabelWidget = NULL;
 static UIWidget* pSelectApUIWidget = NULL;
 static UIWidget* pSelectGraphicCardWidget = NULL;
-static uint32_t  gSelectedApiIndex = 0;
+uint32_t  gSelectedApiIndex = 0;
 
 #if defined(ENABLE_FORGE_RELOAD_SHADER)
 static UIComponent* pReloadShaderComponent = NULL;
@@ -258,6 +258,7 @@ void exitBaseSubsystems()
 // Must be called after Graphics::initRenderer()
 void setupPlatformUI(const IApp::Settings* pSettings)
 {
+    gShowPlatformUI = true; 
     gSelectedApiIndex = gPlatformParameters.mSelectedRendererApi;
 
 #ifdef ENABLE_FORGE_UI
@@ -370,12 +371,11 @@ void togglePlatformUI()
 
 #ifdef ENABLE_FORGE_UI
     extern void platformToggleWindowSystemUI(bool);
-    platformToggleWindowSystemUI(gShowPlatformUI);
+    platformToggleWindowSystemUI(!gShowPlatformUI);
 
-    uiSetComponentActive(pToggleVSyncComponent, gShowPlatformUI);
-    uiSetComponentActive(pAPISwitchingComponent, gShowPlatformUI);
+    uiSetComponentActive(pToggleVSyncComponent, !gShowPlatformUI);
 #if defined(ENABLE_FORGE_RELOAD_SHADER)
-    uiSetComponentActive(pReloadShaderComponent, gShowPlatformUI);
+    uiSetComponentActive(pReloadShaderComponent, !gShowPlatformUI);
 #endif
 #endif
 }

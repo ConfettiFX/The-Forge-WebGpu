@@ -85,7 +85,7 @@
   </ImportGroup>
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets">
-    <Import Project="..\..\..\..\Common_3\IDE\Visual Studio\TF_Shared.props" />
+    <Import Project="..\..\..\Common_3\IDE\Visual Studio\TF_Shared.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets">
     <Import Project="Examples.x64.props" />

@@ -336,7 +336,7 @@ const char* pSkyBoxImageFileName = "suntemple_cube.tex";
 FontDrawDesc gFrameTimeDraw;
 
 const uint32_t gMaxRenderTargetFormats = 3;
-uint32_t       gRenderTargetFormatWidgetData = 2;
+uint32_t       gRenderTargetFormatWidgetData = 0;
 char*          gRenderTargetFormatNames[gMaxRenderTargetFormats] = { NULL };
 uint32_t       gNumRenderTargetFormats = 0;
 
@@ -550,6 +550,8 @@ typedef struct CPUStressTestData
 
     bool bShouldTakeScreenshot = false;
     char screenShotName[512];
+
+    Fence* pSubmissionFence = NULL;
 } CPUStressTestData;
 typedef struct GridInfo
 {
@@ -931,6 +933,8 @@ public:
         cmdRingDesc.mPoolCount = gDataBufferCount;
         cmdRingDesc.mCmdPerPoolCount = 1;
 #if defined(CPU_STRESS_TESTING_ENABLED)
+        // One for Test
+        // One for Submission
         cmdRingDesc.mCmdPerPoolCount = 2;
 #endif
         cmdRingDesc.mAddSyncPrimitives = true;
@@ -1508,7 +1512,7 @@ public:
 
         gFrameIndex = 0;
 
-        mSettings.mShowPlatformUI = true;
+        mSettings.mShowPlatformUI = false;
 
         gCameraFrustum = {};
         gCFSettings.mAspectRatio = (float)mSettings.mWidth / mSettings.mHeight;
@@ -1576,6 +1580,8 @@ public:
             // Run all test for new API as well...
             cpuToggleStressTest(NULL);
         }
+
+        addFence(pRenderer, &gCpuStressTestData.pSubmissionFence);
 #endif
 
         gCpuFrameTimeToken = getCpuProfileToken("Total Frame Time", "Total", 0xff00ffff);
@@ -1642,6 +1648,8 @@ public:
         removeResource(gCpuStressTestData.pVertexBuffer);
         removeResource(gCpuStressTestData.pUniformBuffer);
         uiDestroyComponent(pCpuStressTestWindow);
+
+        removeFence(pRenderer, gCpuStressTestData.pSubmissionFence);
 #endif
 #ifdef BLUR_PIPELINE
         removeResource(pBufferBlurWeights);
@@ -1712,11 +1720,13 @@ public:
                 return false;
 
             // find all supported render target formats
-            TinyImageFormat rtFmt[gMaxRenderTargetFormats] = { pSwapChain->ppRenderTargets[0]->mFormat, TinyImageFormat_R16G16B16A16_UNORM,
-                                                               TinyImageFormat_B10G11R11_UFLOAT };
+            TinyImageFormat rtFmt[gMaxRenderTargetFormats] = { TinyImageFormat_B10G11R11_UFLOAT, pSwapChain->ppRenderTargets[0]->mFormat,
+                                                               TinyImageFormat_R16G16B16A16_UNORM };
             for (uint32_t i = 0; i < gMaxRenderTargetFormats; ++i)
             {
-                if (pRenderer->pGpu->mCapBits.mFormatCaps[rtFmt[i]] || pRenderer->mRendererApi == RENDERER_API_WEBGPU)
+                FormatCapability fmtCap = pRenderer->pGpu->mCapBits.mFormatCaps[rtFmt[i]];
+                bool             canUseFormat = (fmtCap & FORMAT_CAP_LINEAR_FILTER) > 0 && (fmtCap & FORMAT_CAP_RENDER_TARGET) > 0;
+                if (canUseFormat || pRenderer->mRendererApi == RENDERER_API_WEBGPU)
                 {
                     const char* pFrom = TinyImageFormat_Name(rtFmt[i]);
                     char*       pTo = (char*)tf_calloc(strlen(pFrom) + 1, sizeof(char));
@@ -4413,7 +4423,6 @@ void cpuStressTestCommandsEncoding(GpuCmdRingElement* pElem, RenderTarget* pRend
     // Only Opaque Pass test as all we want is the time it is taking for command to encoded..
     cmdBindPipeline(testOnlyCmd, pForwardPipeline);
     cmdBindDescriptorSet(testOnlyCmd, gFrameIndex, pDescriptorSetUniformsScene);
-    cmdBindDescriptorSet(testOnlyCmd, 0, pDescriptorSetMaterials); // Bind first material (Random)
     cmdBindIndexBuffer(testOnlyCmd, pScene->pGeom->pIndexBuffer, pScene->pGeom->mIndexType, 0);
     cmdBindVertexBuffer(testOnlyCmd, 4, pScene->pGeom->pVertexBuffers, pScene->pGeom->mVertexStrides, NULL);
 
@@ -4434,7 +4443,7 @@ void cpuStressTestCommandsEncoding(GpuCmdRingElement* pElem, RenderTarget* pRend
 
     CPUStressTestSample& cSample = GetCpuSampleAt(CSTT_COMMAND_ENCODING);
     cSample.mTime = float(time) / 1000.0f;
-    cSample.mCount = totalDrawCalls;
+    cSample.mCount = totalDrawCalls + 8; // + 8 for pipeline binding..etc.. commands..
     gCpuStressTests[CSTT_COMMAND_ENCODING].mTotalSamplesTaken[GetCpuApiDataIndex()]++;
 
     cpuStressTestDrawAndSubmitDefaultSwapchainRT(pElem, pRenderTargetSwapchain);
@@ -4477,13 +4486,35 @@ void cpuStressTestCommandsSubmission(GpuCmdRingElement* pElem, RenderTarget* pRe
         cmdBindDescriptorSet(testOnlyCmd, dci, pDescriptorSetMaterials);
         cmdDrawIndexed(testOnlyCmd, args.mIndexCount, 0, 0);
     }
+
+    cmdBindRenderTargets(testOnlyCmd, NULL);
+    barrier = { pRenderTarget, RESOURCE_STATE_RENDER_TARGET, RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
+    cmdResourceBarrier(testOnlyCmd, 0, NULL, 0, NULL, 1, &barrier);
     endCmd(testOnlyCmd);
 
-    resetHiresTimer(&gCpuStressTestData.mTimer);
-    ProfileToken& cToken = GetProfileTokenAt(CSTT_COMMAND_SUBMISSION);
-    cpuProfileEnter(cToken);
-    cpuStressTestSubmit(pElem);
-    cpuProfileLeave(cToken, gFrameCount);
+    {
+        // Do not need to wait for fence to be signaled..
+        // Just cannot use pElem->pFence...
+        /*FenceStatus fenceStatus;
+        getFenceStatus(pRenderer, gCpuStressTestData.pSubmissionFence, &fenceStatus);
+        if (fenceStatus == FENCE_STATUS_INCOMPLETE)
+            waitForFences(pRenderer, 1, &gCpuStressTestData.pSubmissionFence);*/
+
+        Semaphore*      waitSemaphores[] = { pImageAcquiredSemaphore };
+        QueueSubmitDesc submitDesc = {};
+        submitDesc.mCmdCount = 1;
+        submitDesc.mSignalSemaphoreCount = 0;
+        submitDesc.mWaitSemaphoreCount = 1;
+        submitDesc.ppCmds = &testOnlyCmd;
+        submitDesc.ppWaitSemaphores = waitSemaphores;
+        submitDesc.pSignalFence = gCpuStressTestData.pSubmissionFence;
+
+        ProfileToken& cToken = GetProfileTokenAt(CSTT_COMMAND_SUBMISSION);
+        cpuProfileEnter(cToken);
+        resetHiresTimer(&gCpuStressTestData.mTimer);
+        queueSubmit(pGraphicsQueue, &submitDesc);
+        cpuProfileLeave(cToken, gFrameCount);
+    }
 
     CPUStressTestSample& cSample = GetCpuSampleAt(CSTT_COMMAND_SUBMISSION);
     cSample.mTime = float(getHiresTimerUSec(&gCpuStressTestData.mTimer, true)) / 1000.0f;
@@ -4528,22 +4559,11 @@ void cpuStressTestBindGroupUpdates(GpuCmdRingElement* pElem, RenderTarget* pRend
         testParams[numDescriptors].pName = "lightMap";
         testParams[numDescriptors++].ppTextures = &pBakedLightMap;
 
-        if (pRenderer->mRendererApi == RENDERER_API_WEBGPU && pRenderer->pGpu->mWgp.mCompatMode)
-        {
-            testParams[numDescriptors].pName = "environmentMap";
-            testParams[numDescriptors++].ppTextures = &pPrefilteredEnvTextures[TEXTURE_COMPAT_MODE_IDX];
+        testParams[numDescriptors].pName = "environmentMap";
+        testParams[numDescriptors++].ppTextures = &pPrefilteredEnvTexture;
 
-            testParams[numDescriptors].pName = "irradianceMap";
-            testParams[numDescriptors++].ppTextures = &pIrradianceTextures[TEXTURE_COMPAT_MODE_IDX];
-        }
-        else
-        {
-            testParams[numDescriptors].pName = "environmentMap";
-            testParams[numDescriptors++].ppTextures = &pPrefilteredEnvTextures[TEXTURE_NON_COMPAT_MODE_IDX];
-
-            testParams[numDescriptors].pName = "irradianceMap";
-            testParams[numDescriptors++].ppTextures = &pIrradianceTextures[TEXTURE_NON_COMPAT_MODE_IDX];
-        }
+        testParams[numDescriptors].pName = "irradianceMap";
+        testParams[numDescriptors++].ppTextures = &pIrradianceTexture;
 
         for (int32_t sci = 0; sci < kShadowMapCascadeCount; ++sci)
         {
@@ -4758,7 +4778,7 @@ void cpuDrawStressTestDataToRenderTarget(Cmd* pCmd, RenderTarget* pRenderTarget,
     dpiScale = 2.625f;
 #endif
     FontDrawDesc drawDesc = {};
-    drawDesc.mFontColor = 0xffffffff;
+    drawDesc.mFontColor = 0xff000000;
     drawDesc.mFontSize = 11.5f;
     drawDesc.mFontID = gFontID;
     float  pxTickWidth = 30.0f * dpiScale;
@@ -4789,6 +4809,7 @@ void cpuDrawStressTestDataToRenderTarget(Cmd* pCmd, RenderTarget* pRenderTarget,
     }
 
     const char* numDrawCallsStr = "# of Drawcalls";
+    const char* numCommandsStr = "# of Commands";
     const char* numUpdatesStr = " # of Updates";
     const char* numBindingStr = " # of Binding";
     float       pxWidth = 73.0f * dpiScale;
@@ -4799,8 +4820,13 @@ void cpuDrawStressTestDataToRenderTarget(Cmd* pCmd, RenderTarget* pRenderTarget,
     {
     case CSTT_BIND_GROUP_UPDATES:
         pxAxisTitle = numUpdatesStr;
+        break;
     case CSTT_BIND_GROUP_BINDINGS:
         pxAxisTitle = numBindingStr;
+        break;
+    case CSTT_COMMAND_ENCODING:
+        pxAxisTitle = numCommandsStr;
+        break;
     default:
         pxAxisTitle = numDrawCallsStr;
     };
@@ -4872,9 +4898,6 @@ void cpuGraphStressTestData(GpuCmdRingElement* pGraphicsElem, RenderTarget* pRen
     memcpy(ubUpdate.pMappedData, &projMat, sizeof(mat4));
     endUpdateResource(&ubUpdate);
 
-    resetCmdPool(pRenderer, pGraphicsElem->pCmdPool);
-    Cmd* pCmd = pGraphicsElem->pCmds[0];
-
     uint32_t numTestTypes = gCpuStressTestData.mTypeWidgetData == CSTT_ALL ? CSTT_ALL : 1;
     uint32_t cTestIdx = gCpuStressTestData.mTypeWidgetData == CSTT_ALL ? 0 : gCpuStressTestData.mTypeWidgetData;
     for (uint32_t i = 0; i < numTestTypes; ++i)
@@ -4890,6 +4913,9 @@ void cpuGraphStressTestData(GpuCmdRingElement* pGraphicsElem, RenderTarget* pRen
         float    xIntervals = 0.0f;
         float    yIntervals = 0.0f;
         cpuUpdateGraphDataForTest(cTestIdx, gInfo, numGridPoints, graphedLineStartIdx, xIntervals, yIntervals);
+
+        resetCmdPool(pRenderer, pGraphicsElem->pCmdPool);
+        Cmd* pCmd = pGraphicsElem->pCmds[0];
 
         beginCmd(pCmd);
         cpuDrawStressTestDataToRenderTarget(pCmd, pRenderTarget, gInfo, cTestIdx, numGridPoints, graphedLineStartIdx, xIntervals,
