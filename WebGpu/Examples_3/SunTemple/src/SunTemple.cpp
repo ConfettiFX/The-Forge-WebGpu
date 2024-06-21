@@ -477,7 +477,7 @@ uint32_t           gViewPoistionsWidgetData = 0;
 /************************************************************************/
 // CPU Stress Testing
 /************************************************************************/
-//#define CPU_STRESS_TESTING_ENABLED
+#define CPU_STRESS_TESTING_ENABLED
 #if defined(CPU_STRESS_TESTING_ENABLED)
 typedef enum CPUStressTestType
 {
